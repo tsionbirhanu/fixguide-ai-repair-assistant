@@ -32,9 +32,13 @@ class Settings(BaseSettings):
     
     # Gemini Configuration
     GEMINI_API_KEY: str = ""
+    GEMINI_API_KEYS: str = ""
     
     # iFixit API Configuration
     IFIXIT_API_KEY: str = ""
+    IFIXIT_API_KEYS: str = ""
+    IFIXIT_APP_ID: str = ""
+    IFIXIT_APP_IDS: str = ""
     
     # Supabase Configuration
     SUPABASE_URL: str = ""
@@ -46,6 +50,7 @@ class Settings(BaseSettings):
     
     # Tavily Search API (for web search fallback)
     TAVILY_API_KEY: str = ""
+    TAVILY_API_KEYS: str = ""
 
     @field_validator("DEBUG", "DEMO_AUTH", mode="before")
     @classmethod
@@ -58,7 +63,21 @@ class Settings(BaseSettings):
 
         normalized = str(value).strip().lower()
         truthy = {"1", "true", "t", "yes", "y", "on", "debug", "dev", "development"}
-        falsy = {"0", "false", "f", "no", "n", "off", "release", "prod", "production"}
+        falsy = {
+            "0",
+            "false",
+            "f",
+            "no",
+            "n",
+            "off",
+            "release",
+            "prod",
+            "production",
+            "info",
+            "warn",
+            "warning",
+            "error",
+        }
 
         if normalized in truthy:
             return True
@@ -70,6 +89,54 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """Parse CORS_ORIGINS into a list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @staticmethod
+    def _split_keys(value: str) -> List[str]:
+        placeholders = {
+            "your_gemini_api_key_here",
+            "your_gemini_flash_2_5_key_here",
+            "your_tavily_api_key_here",
+            "your_ifixit_api_key_here",
+            "your_ifixit_app_id_here",
+            "your_key_1",
+            "your_key_2",
+        }
+        keys = []
+        for key in (value or "").replace("\n", ",").split(","):
+            clean_key = key.strip()
+            if clean_key and clean_key not in placeholders:
+                keys.append(clean_key)
+        return keys
+
+    @property
+    def gemini_api_keys_list(self) -> List[str]:
+        """Return Gemini keys, preferring the multi-key rotation env var."""
+        keys = self._split_keys(self.GEMINI_API_KEYS)
+        if keys:
+            return keys
+        return self._split_keys(self.GEMINI_API_KEY)
+
+    @property
+    def tavily_api_keys_list(self) -> List[str]:
+        """Return Tavily keys, preferring the multi-key rotation env var."""
+        keys = self._split_keys(self.TAVILY_API_KEYS)
+        if keys:
+            return keys
+        return self._split_keys(self.TAVILY_API_KEY)
+
+    @property
+    def ifixit_app_ids_list(self) -> List[str]:
+        """Return optional iFixit App IDs for integrations that receive them."""
+        for value in (
+            self.IFIXIT_APP_IDS,
+            self.IFIXIT_API_KEYS,
+            self.IFIXIT_APP_ID,
+            self.IFIXIT_API_KEY,
+        ):
+            keys = self._split_keys(value)
+            if keys:
+                return keys
+        return []
     
     class Config:
         env_file = ".env"

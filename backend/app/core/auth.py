@@ -5,12 +5,44 @@ Handles user signup, login, and session management
 
 import re
 import uuid
+import base64
 from typing import Optional, Dict
 from supabase import create_client, Client
 from app.core.config import settings
 
 # In-memory store for demo auth users (token -> user dict)
 _demo_users: Dict[str, Dict] = {}
+
+
+def _encode_demo_email(email: str) -> str:
+    encoded = base64.urlsafe_b64encode(email.encode("utf-8")).decode("ascii")
+    return encoded.rstrip("=")
+
+
+def _decode_demo_email(encoded: str) -> Optional[str]:
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        return base64.urlsafe_b64decode(f"{encoded}{padding}").decode("utf-8")
+    except Exception:
+        return None
+
+
+def _create_demo_user(email: str) -> Dict:
+    """Create a demo user with a reload-tolerant token."""
+    demo_token = f"demo_{_encode_demo_email(email)}.{uuid.uuid4().hex}"
+    demo_user = {"id": demo_token, "email": email}
+    _demo_users[demo_token] = demo_user
+    return demo_user
+
+
+def _recover_demo_user(access_token: str) -> Dict:
+    """Recover enough demo identity from an existing token after server reload."""
+    encoded_email = access_token.removeprefix("demo_").rsplit(".", 1)[0]
+    email = _decode_demo_email(encoded_email) or "demo@local.dev"
+    demo_user = {"id": access_token, "email": email}
+    _demo_users[access_token] = demo_user
+    return demo_user
+
 
 def _serialize_obj(obj) -> Optional[dict]:
     """Safely serialize Supabase response objects to dict."""
@@ -102,9 +134,8 @@ class AuthService:
 
         # Demo auth - bypass Supabase when unreachable (local dev, no internet)
         if settings.DEMO_AUTH:
-            demo_token = f"demo_{uuid.uuid4().hex}"
-            demo_user = {"id": demo_token, "email": email}
-            _demo_users[demo_token] = demo_user
+            demo_user = _create_demo_user(email)
+            demo_token = demo_user["id"]
             return {
                 "success": True,
                 "user": demo_user,
@@ -154,9 +185,8 @@ class AuthService:
 
         # Demo auth - bypass Supabase when unreachable
         if settings.DEMO_AUTH:
-            demo_token = f"demo_{uuid.uuid4().hex}"
-            demo_user = {"id": demo_token, "email": email}
-            _demo_users[demo_token] = demo_user
+            demo_user = _create_demo_user(email)
+            demo_token = demo_user["id"]
             return {
                 "success": True,
                 "user": demo_user,
@@ -228,7 +258,7 @@ class AuthService:
         """
         # Demo auth - accept demo tokens
         if settings.DEMO_AUTH and access_token and access_token.startswith("demo_"):
-            return _demo_users.get(access_token)
+            return _demo_users.get(access_token) or _recover_demo_user(access_token)
         
         try:
             response = self.client.auth.get_user(access_token)

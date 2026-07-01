@@ -14,6 +14,9 @@ The previous unfinished items have been addressed in code:
 - Conversations now have server-side list, rename, delete, and message-history support.
 - iFixit and web-search tool fallback text has been cleaned up.
 - iFixit guide selection now scores guides against the user issue instead of always taking the first guide.
+- iFixit device search now strips repair-problem words before searching, so queries such as `iPhone 13 screen replacement` can match the `iPhone 13` device.
+- Gemini and Tavily can use comma-separated backend-only API key rotation pools.
+- Optional iFixit App IDs can also rotate, though public repair-guide reads do not require them.
 - Focused automated tests were added under `backend/tests/`.
 
 External setup is still required: configure `.env`, run `supabase_schema.sql` in Supabase, and verify live Gemini/iFixit/Tavily/Supabase calls with real credentials.
@@ -39,6 +42,7 @@ backend/
       chat.py                Auth, chat streaming, conversations, stats
     core/
       config.py              Environment settings
+      api_keys.py            Backend-only Gemini/Tavily/iFixit key rotation
       auth.py                Supabase and demo-mode authentication
       database.py            Supabase persistence and analytics
     agent/
@@ -91,7 +95,9 @@ Protected endpoints:
 - Stored conversation history is loaded into the agent for continued thread context.
 - LangGraph agent with a system prompt that prioritizes official iFixit guides.
 - iFixit tool that searches for a device, lists guides, selects the most relevant guide, fetches guide details, and formats steps/tools/parts/images/source links as Markdown.
+- iFixit query cleanup for common natural-language repair requests.
 - Tavily web-search fallback when iFixit does not have a suitable result.
+- Backend-only round-robin key rotation for Gemini, Tavily, and optional iFixit App IDs.
 - Supabase `conversations`, `messages`, and `token_usage` persistence.
 - Conversation list, rename, delete, and message retrieval.
 - Basic usage stats.
@@ -111,7 +117,11 @@ DEBUG=true
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 GEMINI_API_KEY=...
+GEMINI_API_KEYS=...
 TAVILY_API_KEY=...
+TAVILY_API_KEYS=...
+IFIXIT_APP_ID=
+IFIXIT_APP_IDS=
 
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
@@ -122,6 +132,14 @@ LANGCHAIN_API_KEY=
 LANGCHAIN_TRACING_V2=false
 LANGCHAIN_PROJECT=fixguide-ai
 ```
+
+Use either the single-key variables or the comma-separated rotation pools:
+
+- `GEMINI_API_KEY` or `GEMINI_API_KEYS=key1,key2,key3`
+- `TAVILY_API_KEY` or `TAVILY_API_KEYS=key1,key2`
+- `IFIXIT_APP_ID` or `IFIXIT_APP_IDS=app1,app2` only if iFixit provides App IDs for your integration
+
+iFixit public guide-search endpoints do not require a key. Do not put Gemini, Tavily, iFixit App IDs, or Supabase service-role keys in the frontend. Browser-visible variables such as `NEXT_PUBLIC_API_BASE_URL` are exposed to users.
 
 `DEBUG` and `DEMO_AUTH` accept normal booleans plus common deployment words:
 
@@ -182,9 +200,15 @@ Commands run successfully:
 Test result:
 
 ```text
-Ran 4 tests
+Ran 7 tests
 OK
 ```
+
+Live iFixit check completed successfully for `iPhone 13 screen replacement`:
+
+- Device match: `iPhone 13`
+- Selected guide: `iPhone 13 Screen Replacement`
+- Source: `https://www.ifixit.com/Guide/iPhone+13+Screen+Replacement/145897`
 
 Discovered routes include:
 
@@ -209,6 +233,6 @@ Still required before calling it production-verified:
 
 1. Run the updated Supabase schema in the actual Supabase project.
 2. Confirm `.env` contains real `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, and `GEMINI_API_KEY`.
-3. Add `TAVILY_API_KEY` if web-search fallback should be active.
+3. Add `TAVILY_API_KEY` or `TAVILY_API_KEYS` if web-search fallback should be active.
 4. Run a live end-to-end chat request against the real services.
 5. Deploy with production CORS origins and secret management.

@@ -1,41 +1,42 @@
 // components/Logo.tsx - FixGuide AI Logo component
 
 import React from "react";
+import { Wrench } from "lucide-react";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   className?: string;
+  showText?: boolean;
 }
 
-export const Logo: React.FC<LogoProps> = ({ size = "md", className = "" }) => {
+export const Logo: React.FC<LogoProps> = ({ size = "md", className = "", showText = true }) => {
   const sizes = {
     sm: "text-xl",
     md: "text-2xl",
     lg: "text-4xl",
   };
+  const iconSizes = {
+    sm: "w-8 h-8",
+    md: "w-9 h-9",
+    lg: "w-12 h-12",
+  };
+  const wrenchSizes = {
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-7 h-7",
+  };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <div className="relative">
-        <div className="w-8 h-8 bg-[rgb(255,138,101)] rounded-lg flex items-center justify-center shadow-md">
-          <svg
-            className="w-5 h-5 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
+    <div className={`flex items-center gap-2.5 ${className}`}>
+      <div className={`${iconSizes[size]} relative flex items-center justify-center rounded-xl bg-[rgb(255,138,101)] text-white shadow-sm`}>
+        <Wrench className={wrenchSizes[size]} strokeWidth={2.4} />
       </div>
-      <span
-        className={`font-bold text-[rgb(15,15,15)] dark:text-white ${sizes[size]}`}>
-        Fix<span className="text-[rgb(255,138,101)]">Guide</span>
-      </span>
+      {showText && (
+        <span
+          className={`font-bold text-[rgb(15,15,15)] dark:text-white ${sizes[size]}`}>
+          Fix<span className="text-[rgb(255,138,101)]">Guide</span>
+        </span>
+      )}
     </div>
   );
 };

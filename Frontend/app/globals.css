@@ -49,6 +49,17 @@
 
 :root {
   --radius: 0.5rem;
+  --chat-bg: 255 255 255;
+  --chat-sidebar-bg: 249 250 251;
+  --chat-surface: 255 255 255;
+  --chat-surface-soft: 249 250 251;
+  --chat-elevated: 243 244 246;
+  --chat-border: 229 231 235;
+  --chat-text: 15 15 15;
+  --chat-muted: 107 114 128;
+  --chat-hover: 243 244 246;
+  --chat-user-bg: 255 138 101;
+  --chat-user-text: 255 255 255;
   --user-bubble: 255 138 101;
   --assistant-bubble: 31 41 55;
   /* Soft Orange: #FF8A65 / Deep Gray: #1F2937 / White: #FFFFFF / Black: #0F0F0F */
@@ -87,6 +98,17 @@
 
 /* ChatGPT-style dark theme */
 .dark {
+  --chat-bg: 0 0 0;
+  --chat-sidebar-bg: 0 0 0;
+  --chat-surface: 18 18 18;
+  --chat-surface-soft: 33 33 33;
+  --chat-elevated: 42 42 42;
+  --chat-border: 46 46 46;
+  --chat-text: 236 236 241;
+  --chat-muted: 180 180 180;
+  --chat-hover: 24 24 24;
+  --chat-user-bg: 42 42 42;
+  --chat-user-text: 255 255 255;
   --background: 32 33 35; /* #202123 ChatGPT main bg */
   --foreground: 236 236 241; /* #ececf1 */
   --card: 43 44 47; /* #2b2c2f */
@@ -129,4 +151,41 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(156 163 175) rgb(255 255 255);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgb(255 255 255);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgb(156 163 175);
+  border: 2px solid rgb(255 255 255);
+  border-radius: 999px;
+}
+
+.dark * {
+  scrollbar-color: rgb(86 86 86) rgb(0 0 0);
+}
+
+.dark *::-webkit-scrollbar-track {
+  background: rgb(0 0 0);
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background: rgb(86 86 86);
+  border-color: rgb(0 0 0);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgb(120 120 120);
 }

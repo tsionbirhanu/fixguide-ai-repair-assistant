@@ -9,7 +9,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
-from app.core.config import settings
+from app.core.api_keys import get_next_gemini_api_key
 from app.agent.ifixit_tool import search_ifixit_repair_guide
 from app.agent.web_search_tool import search_web_for_repair_solution
 
@@ -31,11 +31,14 @@ SYSTEM_PROMPT = """You are FixGuide AI, an expert repair assistant that helps us
 - If both tools fail, admit you don't have information
 - Present repair steps clearly with proper formatting
 - Warn users about safety concerns when applicable
+- If a tool result contains Markdown image links such as `![Step 1](https://...)`, keep those image links in your final answer
+- For repair guides, include the image for each step that has one unless the user asks for a short summary
+- Do not replace Markdown images with plain URLs or omit them
 
 **Response Style:**
 - Be concise but thorough
 - Use proper Markdown formatting
-- Include images from repair guides when available
+- Include repair images with normal Markdown image syntax, for example `![Step 1](https://...)`
 - Provide step-by-step instructions clearly
 """
 
@@ -48,7 +51,6 @@ class AgentState(MessagesState):
 
 _DEFAULT_CHECKPOINTER = MemorySaver()
 _DEFAULT_COMPILED_AGENT = None
-_NO_CHECKPOINT_COMPILED_AGENT = None
 _USE_DEFAULT_CHECKPOINTER = object()
 
 
@@ -57,12 +59,13 @@ def create_agent():
     Create the LangGraph agent with tools
     """
     # Initialize Gemini model
-    if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your_gemini_flash_2_5_key_here":
-        raise ValueError("GEMINI_API_KEY not configured in .env file")
+    gemini_api_key = get_next_gemini_api_key()
+    if not gemini_api_key:
+        raise ValueError("GEMINI_API_KEY or GEMINI_API_KEYS is not configured in .env file")
     
     model = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
-        google_api_key=settings.GEMINI_API_KEY,
+        google_api_key=gemini_api_key,
         temperature=0.2,  # Lower temperature for more factual responses
         streaming=True
     )
@@ -130,7 +133,7 @@ def compile_agent(checkpointer=_USE_DEFAULT_CHECKPOINTER):
     checkpointer=None compiles a graph without checkpointing, which is useful
     when the caller explicitly supplies persisted message history.
     """
-    global _DEFAULT_COMPILED_AGENT, _NO_CHECKPOINT_COMPILED_AGENT
+    global _DEFAULT_COMPILED_AGENT
 
     if checkpointer is _USE_DEFAULT_CHECKPOINTER:
         if _DEFAULT_COMPILED_AGENT is None:
@@ -138,8 +141,6 @@ def compile_agent(checkpointer=_USE_DEFAULT_CHECKPOINTER):
         return _DEFAULT_COMPILED_AGENT
 
     if checkpointer is None:
-        if _NO_CHECKPOINT_COMPILED_AGENT is None:
-            _NO_CHECKPOINT_COMPILED_AGENT = create_agent().compile()
-        return _NO_CHECKPOINT_COMPILED_AGENT
+        return create_agent().compile()
 
     return create_agent().compile(checkpointer=checkpointer)

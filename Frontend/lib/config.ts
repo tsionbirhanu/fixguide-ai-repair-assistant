@@ -19,6 +19,7 @@ export const API_CONFIG = {
 export const STORAGE_KEYS = {
   AVATAR: "fixguide_avatar",
   CONVERSATIONS: "fixguide_conversations",
+  CONVERSATION_MESSAGES: "fixguide_conversation_messages",
 };
 
 // Sample questions for new users

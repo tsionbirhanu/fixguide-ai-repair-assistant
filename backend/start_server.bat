@@ -8,7 +8,7 @@ echo.
 echo Starting server at http://127.0.0.1:8000
 echo API Documentation: http://127.0.0.1:8000/docs
 echo.
-echo ⚠️  DO NOT CLOSE THIS WINDOW!
+echo WARNING: DO NOT CLOSE THIS WINDOW!
 echo    The server will stop if you close it.
 echo.
 echo ========================================

@@ -4,6 +4,31 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import {
+  BarChart3,
+  Blocks,
+  Camera,
+  Check,
+  ChevronRight,
+  ImagePlus,
+  Library,
+  LogOut,
+  Mic,
+  MicOff,
+  Moon,
+  PanelLeftClose,
+  Paperclip,
+  Pencil,
+  SendHorizontal,
+  Search,
+  Share2,
+  Sun,
+  Trash2,
+  X,
+  MessageCircle,
+  MoreHorizontal,
+  SquarePen,
+} from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { MessageBubble } from "@/components/MessageBubble";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -13,9 +38,11 @@ import {
   fetchConversations,
   fetchConversationMessages,
   saveConversationToLocal,
+  saveMessagesToLocal,
   deleteConversation,
   renameConversation,
   type Conversation,
+  type ChatMessage,
 } from "@/lib/chatApi";
 import { API_CONFIG, SAMPLE_QUESTIONS, STORAGE_KEYS } from "@/lib/config";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
@@ -37,12 +64,15 @@ export default function ChatPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [conversationError, setConversationError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { theme, toggleTheme } = useTheme();
   const { isListening, error: voiceError, startListening, stopListening } =
@@ -76,6 +106,12 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentResponse]);
 
+  useEffect(() => {
+    if (sidebarOpen && searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [sidebarOpen, searchOpen]);
+
   const handleLogout = async () => {
     await authService.logout();
     router.push("/login");
@@ -89,6 +125,11 @@ export default function ChatPage() {
     setStatus("");
     setAttachedImages([]);
     setProfileOpen(false);
+  };
+
+  const handleOpenSearch = () => {
+    setSidebarOpen(true);
+    setSearchOpen(true);
   };
 
   const handleAttachImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +207,7 @@ export default function ChatPage() {
         msgs.map((m) => ({
           role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
           content: m.content || "",
+          images: m.images,
         }))
       );
       setThreadId(conv.thread_id);
@@ -228,7 +270,10 @@ export default function ChatPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          authService.logout();
+          if (token?.startsWith("demo_")) {
+            throw new Error("Your local demo session was interrupted. Please try sending again.");
+          }
+          await authService.logout();
           router.push("/login");
           return;
         }
@@ -263,10 +308,14 @@ export default function ChatPage() {
                 case "done": {
                   const tid = data.thread_id || null;
                   setThreadId(tid);
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "assistant", content: assistantMessage },
-                  ]);
+                  setMessages((prev) => {
+                    const next = [
+                      ...prev,
+                      { role: "assistant", content: assistantMessage },
+                    ] as ChatMessage[];
+                    if (tid) saveMessagesToLocal(tid, next);
+                    return next;
+                  });
                   setCurrentResponse("");
                   setStatus("");
                   setIsLoading(false);
@@ -278,10 +327,14 @@ export default function ChatPage() {
                   const errTid = data.thread_id || threadId;
                   if (errTid) saveConversationToLocal(errTid, text);
                   setThreadId(errTid);
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "assistant", content: `Sorry, I encountered an error: ${data.content || "Please try again."}` },
-                  ]);
+                  setMessages((prev) => {
+                    const next = [
+                      ...prev,
+                      { role: "assistant", content: `Sorry, I encountered an error: ${data.content || "Please try again."}` },
+                    ] as ChatMessage[];
+                    if (errTid) saveMessagesToLocal(errTid, next);
+                    return next;
+                  });
                   setCurrentResponse("");
                   setStatus("");
                   setIsLoading(false);
@@ -297,14 +350,20 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "Sorry, I encountered an error. Please try again or start a new conversation.",
-        },
-      ]);
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Sorry, I encountered an error. Please try again or start a new conversation.";
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          {
+            role: "assistant",
+            content: message,
+          },
+        ] as ChatMessage[];
+        if (threadId) saveMessagesToLocal(threadId, next);
+        return next;
+      });
       setCurrentResponse("");
       setStatus("");
       setIsLoading(false);
@@ -323,54 +382,206 @@ export default function ChatPage() {
     }
   };
 
+  const handleShare = async () => {
+    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+    const shareTitle = "FixGuide AI";
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, url: shareUrl });
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // Sharing is optional; ignore cancelled share dialogs and clipboard failures.
+    }
+  };
+
   const user = authService.getUser();
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredConversations = normalizedSearch
+    ? conversations.filter((conv) =>
+        (conv.title || "New chat").toLowerCase().includes(normalizedSearch)
+      )
+    : conversations;
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-[rgb(var(--chat-bg))] text-[rgb(var(--chat-text))]">
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? "w-64" : "w-0"
-        } flex-shrink-0 border-r border-border bg-card overflow-x-hidden overflow-y-auto transition-all duration-200 flex flex-col`}
+          sidebarOpen ? "w-[304px]" : "w-[76px]"
+        } flex-shrink-0 border-r border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-sidebar-bg))] overflow-x-hidden overflow-y-auto transition-all duration-200 flex flex-col`}
       >
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <Logo size="sm" />
+        {!sidebarOpen ? (
+          <div className="flex h-full flex-col items-center py-4">
             <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-[rgb(229,231,235)] dark:hover:bg-[rgb(55,65,81)]"
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-xl transition-transform hover:scale-105"
+              title="Open sidebar"
+              aria-label="Open sidebar"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              </svg>
+              <Logo size="sm" showText={false} />
+            </button>
+
+            <div className="mt-8 flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={handleNewConversation}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="New chat"
+                aria-label="New chat"
+              >
+                <SquarePen className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenSearch}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="Search chats"
+                aria-label="Search chats"
+              >
+                <Search className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="Library"
+                aria-label="Open library"
+              >
+                <Library className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="Chats"
+                aria-label="Open chats"
+              >
+                <MessageCircle className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="mt-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[rgb(var(--chat-elevated))] text-sm font-semibold text-[rgb(255,138,101)] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              title={user?.email || "Profile"}
+              aria-label="Open profile"
+            >
+              {avatar ? (
+                <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                user?.email?.[0]?.toUpperCase() || "?"
+              )}
             </button>
           </div>
-          <Button
-            variant="primary"
-            className="w-full mt-4"
-            onClick={handleNewConversation}
+        ) : (
+          <>
+        <div className="flex items-center justify-between px-5 pb-4 pt-5">
+          <Logo size="sm" showText={false} />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            title="Close sidebar"
+            aria-label="Close sidebar"
           >
-            <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Chat
-          </Button>
+            <PanelLeftClose className="h-5 w-5" strokeWidth={2} />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <h3 className="px-4 py-2 text-xs font-semibold text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] uppercase">
-            History
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <nav className="space-y-1 pb-6">
+            <button
+              type="button"
+              onClick={handleNewConversation}
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            >
+              <SquarePen className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
+              <span className="text-sm font-medium">New chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenSearch}
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            >
+              <Search className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
+              <span className="text-sm font-medium">Search chats</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            >
+              <Library className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
+              <span className="text-sm font-medium">Library</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            >
+              <Blocks className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
+              <span className="text-sm font-medium">Apps</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+            >
+              <MoreHorizontal className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
+              <span className="text-sm font-medium">More</span>
+            </button>
+          </nav>
+
+          <button
+            type="button"
+            className="mb-7 flex h-10 w-full items-center gap-1 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+          >
+            <span className="text-sm font-semibold">Projects</span>
+            <ChevronRight className="h-4 w-4" strokeWidth={2.1} />
+          </button>
+
+          <h3 className="px-3 pb-2 text-sm font-semibold text-[rgb(var(--chat-text))]">
+            Chats
           </h3>
+          {searchOpen && (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] px-3 py-2">
+              <Search className="h-4 w-4 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2} />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search chats"
+                className="min-w-0 flex-1 bg-transparent text-sm text-[rgb(var(--chat-text))] outline-none placeholder:text-[rgb(var(--chat-muted))]"
+              />
+              {(searchQuery || searchOpen) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchOpen(false);
+                  }}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
+                  title="Close search"
+                  aria-label="Close search"
+                >
+                  <X className="h-4 w-4" strokeWidth={2.1} />
+                </button>
+              )}
+            </div>
+          )}
           {historyLoading ? (
-            <p className="px-4 py-2 text-sm text-[rgb(156,163,175)]">Loading...</p>
+            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">Loading...</p>
           ) : conversations.length === 0 ? (
-            <p className="px-4 py-2 text-sm text-[rgb(156,163,175)]">No conversations yet</p>
+            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No conversations yet</p>
+          ) : filteredConversations.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No matching chats</p>
           ) : (
-            <ul className="space-y-0.5 pb-4">
-              {conversations.map((conv) => (
-                <li key={conv.thread_id} className="group/item relative mx-2">
+            <ul className="space-y-1 pb-4">
+              {filteredConversations.map((conv) => (
+                <li key={conv.thread_id} className="group/item relative">
                   {renamingId === conv.thread_id ? (
-                    <div className="flex gap-1 py-1">
+                    <div className="flex gap-1 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] p-1.5">
                       <input
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
@@ -380,56 +591,54 @@ export default function ChatPage() {
                             confirmRename();
                           }
                         }}
-                        className="flex-1 px-2 py-1.5 text-sm rounded border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] bg-white dark:bg-[rgb(15,15,15)] text-[rgb(15,15,15)] dark:text-white"
+                        className="min-w-0 flex-1 rounded-lg border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-2 py-1.5 text-sm text-[rgb(var(--chat-text))] outline-none focus:ring-2 focus:ring-[rgb(255,138,101)]"
                         autoFocus
                       />
                       <button
                         onClick={confirmRename}
-                        className="p-1.5 rounded text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        title="Save"
+                        aria-label="Save conversation name"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        <Check className="h-4 w-4" strokeWidth={2.2} />
                       </button>
                       <button
                         onClick={() => { setRenamingId(null); setRenameValue(""); }}
-                        className="p-1.5 rounded text-[rgb(107,114,128)] hover:bg-[rgb(229,231,235)] dark:hover:bg-[rgb(55,65,81)]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
+                        title="Cancel"
+                        aria-label="Cancel rename"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="h-4 w-4" strokeWidth={2.2} />
                       </button>
                     </div>
                   ) : (
                     <>
                       <button
                         onClick={() => handleSelectConversation(conv)}
-                        className={`w-full text-left px-4 py-2.5 pr-16 text-sm rounded-lg transition-colors ${
+                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
                           threadId === conv.thread_id
-                            ? "bg-[rgb(255,138,101)]/20 text-[rgb(255,138,101)]"
-                            : "hover:bg-[rgb(229,231,235)] dark:hover:bg-[rgb(55,65,81)] text-[rgb(15,15,15)] dark:text-white"
+                            ? "bg-[rgb(var(--chat-elevated))] text-[rgb(var(--chat-text))]"
+                            : "text-[rgb(var(--chat-text))] hover:bg-[rgb(var(--chat-hover))]"
                         }`}
                       >
-                        {conv.title || "New chat"}
+                        <span className="truncate">{conv.title || "New chat"}</span>
                       </button>
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                      <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
                         <button
                           onClick={(e) => handleRenameConversation(e, conv)}
-                          className="p-1.5 rounded hover:bg-[rgb(229,231,235)] dark:hover:bg-[rgb(55,65,81)] text-[rgb(107,114,128)]"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-elevated))]"
                           title="Rename"
+                          aria-label="Rename conversation"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
+                          <Pencil className="h-3.5 w-3.5" strokeWidth={2.1} />
                         </button>
                         <button
                           onClick={(e) => handleDeleteConversation(e, conv.thread_id)}
-                          className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
                           title="Delete"
+                          aria-label="Delete conversation"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          <Trash2 className="h-3.5 w-3.5" strokeWidth={2.1} />
                         </button>
                       </div>
                     </>
@@ -446,12 +655,12 @@ export default function ChatPage() {
         </div>
 
         {/* Profile section in sidebar - inline expandable */}
-        <div className="p-4 border-t border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] flex-shrink-0">
+        <div className="flex-shrink-0 border-t border-[rgb(var(--chat-border))] p-3">
           <button
-            className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-[rgb(229,231,235)] dark:hover:bg-[rgb(55,65,81)] transition-colors"
+            className="flex w-full items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-[rgb(var(--chat-hover))]"
             onClick={() => setProfileOpen(!profileOpen)}
           >
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-[rgb(229,231,235)] dark:bg-[rgb(55,65,81)] flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-[rgb(var(--chat-elevated))] flex items-center justify-center flex-shrink-0">
               {avatar ? (
                 <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
@@ -461,24 +670,19 @@ export default function ChatPage() {
               )}
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-sm font-medium text-[rgb(15,15,15)] dark:text-white truncate">
+              <p className="text-sm font-medium text-[rgb(var(--chat-text))] truncate">
                 {user?.email || "User"}
               </p>
-              <p className="text-xs text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)]">
-                {profileOpen ? "Hide profile" : "Profile"}
+              <p className="text-xs text-[rgb(var(--chat-muted))]">
+                Personal account
               </p>
             </div>
-            <svg
-              className={`w-4 h-4 transition-transform ${profileOpen ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <span className="rounded-full border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-elevated))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--chat-text))]">
+              Account
+            </span>
           </button>
           {profileOpen && (
-            <div className="mt-3 p-3 rounded-xl bg-[rgb(249,250,251)] dark:bg-[rgb(31,41,55)] border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)]">
+            <div className="mt-2 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] p-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -486,8 +690,8 @@ export default function ChatPage() {
                 className="hidden"
                 onChange={handleAvatarUpload}
               />
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-[rgb(229,231,235)] dark:bg-[rgb(55,65,81)] flex items-center justify-center flex-shrink-0">
+              <div className="mb-3 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-[rgb(var(--chat-elevated))] flex items-center justify-center flex-shrink-0">
                   {avatar ? (
                     <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -496,14 +700,15 @@ export default function ChatPage() {
                     </span>
                   )}
                 </div>
-                <div>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--chat-border))] px-3 text-sm font-medium text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
                   >
-                    Upload Photo
-                  </Button>
+                    <Camera className="h-4 w-4" strokeWidth={2} />
+                    Photo
+                  </button>
                   {avatar && (
                     <Button variant="ghost" size="sm" onClick={removeAvatar} className="ml-1">
                       Remove
@@ -511,82 +716,82 @@ export default function ChatPage() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-3 truncate">
+              <p className="text-xs text-[rgb(var(--chat-muted))] mb-3 truncate">
                 {user?.email}
               </p>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setProfileOpen(false); router.push("/stats"); }}>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setProfileOpen(false); router.push("/stats"); }} className="gap-2">
+                  <BarChart3 className="h-4 w-4" strokeWidth={2} />
                   Statistics
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
+                <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
+                  <LogOut className="h-4 w-4" strokeWidth={2} />
                   Logout
                 </Button>
               </div>
             </div>
           )}
         </div>
+          </>
+        )}
       </aside>
 
-      {!sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed left-4 top-4 z-10 p-2 rounded-lg bg-white dark:bg-[rgb(31,41,55)] border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] shadow"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      )}
-
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex-shrink-0 border-b border-border bg-background px-4 py-3 flex items-center justify-between">
+      <div className="flex-1 flex flex-col min-w-0 bg-[rgb(var(--chat-bg))]">
+        <header className="flex-shrink-0 border-b border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">
+            <h1 className="text-lg font-semibold text-[rgb(var(--chat-text))]">
               FixGuide AI
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[rgb(var(--chat-muted))]">
               Ask about device repairs and troubleshooting
             </p>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-            title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-          >
-            {theme === "dark" ? (
-              <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleShare}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              title="Share"
+              aria-label="Share chat"
+            >
+              <Share2 className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+              aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" strokeWidth={2} />
+              ) : (
+                <Moon className="h-5 w-5" strokeWidth={2} />
+              )}
+            </button>
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="flex-1 overflow-y-auto bg-[rgb(var(--chat-bg))]">
+          <div className="max-w-5xl mx-auto px-4 py-8 lg:px-8">
             {messages.length === 0 && !currentResponse && (
               <div className="text-center py-12">
                 <div className="flex justify-center mb-6">
                   <Logo size="lg" />
                 </div>
-                <h2 className="text-2xl font-bold text-[rgb(15,15,15)] dark:text-white mb-4">
+                <h2 className="text-2xl font-bold text-[rgb(var(--chat-text))] mb-4">
                   How can I help you today?
                 </h2>
-                <p className="text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-8">
+                <p className="text-[rgb(var(--chat-muted))] mb-8">
                   Ask me anything about device repairs and troubleshooting
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-4xl mx-auto">
                   {SAMPLE_QUESTIONS.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => sendMessage(q)}
-                      className="p-4 text-left rounded-xl border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] hover:border-[rgb(255,138,101)] dark:hover:border-[rgb(255,138,101)] bg-white dark:bg-[rgb(31,41,55)] hover:shadow-md transition-all"
+                      className="p-4 text-left rounded-xl border border-[rgb(var(--chat-border))] hover:border-[rgb(255,138,101)] bg-[rgb(var(--chat-surface))] hover:bg-[rgb(var(--chat-hover))] transition-all"
                     >
-                      <p className="text-sm text-[rgb(15,15,15)] dark:text-white">{q}</p>
+                      <p className="text-sm text-[rgb(var(--chat-text))]">{q}</p>
                     </button>
                   ))}
                 </div>
@@ -604,7 +809,7 @@ export default function ChatPage() {
             ))}
             {isLoading && !currentResponse && (
               <div className="flex justify-start mb-4">
-                <div className="rounded-2xl px-5 py-3 bg-card border border-border">
+                <div className="rounded-2xl px-5 py-3 bg-[rgb(var(--chat-surface))] border border-[rgb(var(--chat-border))]">
                   <span className="inline-flex gap-1">
                     <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
                     <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
@@ -626,25 +831,25 @@ export default function ChatPage() {
         </div>
 
         {/* Input area with voice and attach */}
-        <div className="flex-shrink-0 border-t border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] bg-white dark:bg-[rgb(24,24,24)] px-4 py-4">
-          <div className="max-w-3xl mx-auto">
+        <div className="flex-shrink-0 border-t border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-4 py-4">
+          <div className="max-w-5xl mx-auto lg:px-8">
             {attachedImages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="mb-3 flex flex-wrap gap-2">
                 {attachedImages.map((src, i) => (
                   <div key={i} className="relative group/preview">
                     <img
                       src={src}
                       alt={`Attach ${i + 1}`}
-                      className="w-14 h-14 rounded-lg object-cover border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)]"
+                      className="h-16 w-16 rounded-xl border border-[rgb(var(--chat-border))] object-cover"
                     />
                     <button
                       type="button"
                       onClick={() => removeAttachedImage(i)}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/preview:opacity-100 transition-opacity"
+                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity group-hover/preview:opacity-100"
+                      title="Remove image"
+                      aria-label="Remove image"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <X className="h-3 w-3" strokeWidth={2.5} />
                     </button>
                   </div>
                 ))}
@@ -653,7 +858,10 @@ export default function ChatPage() {
             {voiceError && (
               <p className="text-sm text-amber-600 dark:text-amber-400 mb-2">{voiceError}</p>
             )}
-            <form onSubmit={handleSubmit} className="relative flex gap-2">
+            <form
+              onSubmit={handleSubmit}
+              className="rounded-3xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface-soft))] px-3 py-2 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-[rgb(255,138,101)]"
+            >
               <input
                 ref={chatFileInputRef}
                 type="file"
@@ -662,71 +870,70 @@ export default function ChatPage() {
                 className="hidden"
                 onChange={handleAttachImage}
               />
-              <button
-                type="button"
-                onClick={() => chatFileInputRef.current?.click()}
-                disabled={isLoading || attachedImages.length >= 4}
-                className="flex-shrink-0 p-3 rounded-xl border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] hover:border-[rgb(255,138,101)] text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] disabled:opacity-50"
-                title="Attach image"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={isListening ? stopListening : startListening}
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask AI about device repairs..."
                 disabled={isLoading}
-                className={`flex-shrink-0 p-3 rounded-xl border transition-all ${
-                  isListening
-                    ? "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-600"
-                    : "border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] hover:border-[rgb(255,138,101)] text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)]"
-                }`}
-                title={isListening ? "Stop listening" : "Voice input"}
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill={isListening ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v7m0-9a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"
-                  />
-                </svg>
-              </button>
-              <div className="flex-1 relative">
-                <textarea
-                  ref={textareaRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask AI about device repairs..."
-                  disabled={isLoading}
-                  rows={1}
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] bg-white dark:bg-[rgb(15,15,15)] text-[rgb(15,15,15)] dark:text-white placeholder-[rgb(156,163,175)] focus:outline-none focus:ring-2 focus:ring-[rgb(255,138,101)] resize-none disabled:opacity-50"
-                />
+                rows={1}
+                className="min-h-[48px] w-full resize-none bg-transparent px-2 py-3 text-sm leading-6 text-[rgb(var(--chat-text))] outline-none placeholder-[rgb(var(--chat-muted))] disabled:opacity-50"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    disabled={isLoading || attachedImages.length >= 4}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[rgb(var(--chat-muted))] transition-colors hover:bg-[rgb(var(--chat-elevated))] disabled:opacity-50"
+                    title="Attach file"
+                    aria-label="Attach file"
+                  >
+                    <Paperclip className="h-5 w-5" strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    disabled={isLoading || attachedImages.length >= 4}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[rgb(var(--chat-muted))] transition-colors hover:bg-[rgb(var(--chat-elevated))] disabled:opacity-50"
+                    title="Add image"
+                    aria-label="Add image"
+                  >
+                    <ImagePlus className="h-5 w-5" strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={isListening ? stopListening : startListening}
+                    disabled={isLoading}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:opacity-50 ${
+                      isListening
+                        ? "bg-red-100 text-red-600 dark:bg-red-900/30"
+                        : "text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-elevated))]"
+                    }`}
+                    title={isListening ? "Stop listening" : "Voice input"}
+                    aria-label={isListening ? "Stop listening" : "Voice input"}
+                  >
+                    {isListening ? (
+                      <MicOff className="h-5 w-5" strokeWidth={2} />
+                    ) : (
+                      <Mic className="h-5 w-5" strokeWidth={2} />
+                    )}
+                  </button>
+                </div>
                 <button
                   type="submit"
                   disabled={(!inputValue.trim() && attachedImages.length === 0) || isLoading}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[rgb(255,138,101)] text-white hover:bg-[rgb(255,120,85)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(255,138,101)] text-white transition-colors hover:bg-[rgb(255,120,85)] disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Send message"
+                  aria-label="Send message"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
+                  <SendHorizontal className="h-5 w-5" strokeWidth={2.2} />
                 </button>
               </div>
             </form>
-            <p className="text-xs text-[rgb(156,163,175)] text-center mt-2">
-              Press Enter to send • Shift+Enter for new line • Attach image or use voice
+            <p className="mt-2 text-center text-xs text-[rgb(156,163,175)]">
+              Press Enter to send | Shift+Enter for new line
             </p>
           </div>
         </div>

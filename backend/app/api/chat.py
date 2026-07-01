@@ -6,6 +6,7 @@ Handles authentication, conversation management, and streaming repair chat.
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict, List, Optional
 import json
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -22,6 +23,7 @@ router = APIRouter()
 # Demo/fallback mode: in-memory conversation storage when DB is unavailable.
 _demo_conversations: Dict[str, Dict[str, List[Dict]]] = {}
 _demo_conversation_titles: Dict[str, Dict[str, str]] = {}
+_MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+)\)")
 
 
 def _get_db_service():
@@ -320,6 +322,59 @@ def _build_human_message(content: str, images: Optional[List[str]] = None) -> Hu
     return HumanMessage(content=parts)
 
 
+def _content_to_text(value) -> str:
+    """Convert LangChain event content into plain text."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text") or item.get("content") or ""))
+            else:
+                parts.append(_content_to_text(item))
+        return "".join(parts)
+    if hasattr(value, "content"):
+        return _content_to_text(value.content)
+    return str(value)
+
+
+def _extract_markdown_images(text: str, limit: int = 8) -> List[str]:
+    """Return unique Markdown image lines from tool output."""
+    images = []
+    seen_urls = set()
+    for alt, url in _MARKDOWN_IMAGE_RE.findall(text or ""):
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        safe_alt = alt.strip() or "Repair image"
+        images.append(f"![{safe_alt}]({url})")
+        if len(images) >= limit:
+            break
+    return images
+
+
+def _missing_image_section(response: str, tool_outputs: List[str]) -> str:
+    """Build a reference-image section when the model omitted source images."""
+    tool_images = _extract_markdown_images("\n".join(tool_outputs))
+    if not tool_images:
+        return ""
+
+    response_urls = {url for _, url in _MARKDOWN_IMAGE_RE.findall(response or "")}
+    missing_images = []
+    for image in tool_images:
+        match = _MARKDOWN_IMAGE_RE.search(image)
+        if match and match.group(2) not in response_urls:
+            missing_images.append(image)
+
+    if not missing_images:
+        return ""
+
+    return "\n\n## Reference Images\n\n" + "\n\n".join(missing_images) + "\n\n"
+
+
 async def _load_history_messages(user_id: str, thread_id: str, access_token: Optional[str]) -> List:
     """Load saved thread history as LangChain messages for the next agent turn."""
     rows: List[Dict] = []
@@ -419,6 +474,7 @@ async def stream_chat_response(
         yield f"data: {json.dumps({'type': 'status', 'content': 'Searching for repair guide...'})}\n\n"
 
         full_response = ""
+        tool_outputs: List[str] = []
 
         async for event in agent.astream_events(
             {"messages": messages_for_agent},
@@ -452,7 +508,16 @@ async def stream_chat_response(
                 yield f"data: {json.dumps({'type': 'status', 'content': f'Using {tool_name}...'})}\n\n"
 
             elif kind == "on_tool_end":
+                tool_output = event.get("data", {}).get("output")
+                tool_output_text = _content_to_text(tool_output)
+                if tool_output_text:
+                    tool_outputs.append(tool_output_text)
                 yield f"data: {json.dumps({'type': 'status', 'content': 'Processing results...'})}\n\n"
+
+        image_section = _missing_image_section(full_response, tool_outputs)
+        if image_section:
+            full_response += image_section
+            yield f"data: {json.dumps({'type': 'token', 'content': image_section})}\n\n"
 
         await _save_assistant_message(user_id, thread_id, full_response, access_token)
         yield f"data: {json.dumps({'type': 'done', 'thread_id': thread_id})}\n\n"

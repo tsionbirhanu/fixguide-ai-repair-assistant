@@ -60,6 +60,13 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 # Google Gemini AI
 GEMINI_API_KEY=your_gemini_api_key_here
+# Optional backend-only rotation pool. If set, this is used before GEMINI_API_KEY.
+GEMINI_API_KEYS=
+
+# iFixit public guide search does not require a key.
+# Optional App IDs only if iFixit provides them for a complex integration.
+IFIXIT_APP_ID=
+IFIXIT_APP_IDS=
 
 # Supabase (Get from Supabase Dashboard)
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -68,9 +75,14 @@ SUPABASE_SERVICE_KEY=your_service_key_here
 
 # Tavily Search (Optional - for web fallback)
 TAVILY_API_KEY=your_tavily_key_here
+# Optional backend-only rotation pool. If set, this is used before TAVILY_API_KEY.
+TAVILY_API_KEYS=
 
-# iFixit API (No key required for public endpoints)
-IFIXIT_API_KEY=
+# iFixit API
+# No key required for public repair-guide reads.
+# If iFixit gives you App IDs, use IFIXIT_APP_ID or IFIXIT_APP_IDS.
+IFIXIT_APP_ID=
+IFIXIT_APP_IDS=
 ```
 
 ### Step 3: Setup Supabase Database
@@ -91,7 +103,7 @@ IFIXIT_API_KEY=
 1. Visit [ai.google.dev](https://ai.google.dev)
 2. Click "Get API Key"
 3. Create a new project or select existing
-4. Copy the API key to `.env` as `GEMINI_API_KEY`
+4. Copy the API key to `.env` as `GEMINI_API_KEY`, or add multiple keys as `GEMINI_API_KEYS=key1,key2,key3`
 
 #### Supabase Keys (Required)
 
@@ -105,7 +117,13 @@ IFIXIT_API_KEY=
 
 1. Visit [tavily.com](https://tavily.com)
 2. Sign up and create an API key
-3. Copy to `.env` as `TAVILY_API_KEY`
+3. Copy to `.env` as `TAVILY_API_KEY`, or add multiple keys as `TAVILY_API_KEYS=key1,key2`
+
+Keep Gemini, Tavily, and Supabase service-role keys in the backend `.env` only. Frontend `NEXT_PUBLIC_*` variables are visible in the browser.
+
+#### iFixit App ID (Usually Not Needed)
+
+Public repair-guide search works without an iFixit key. iFixit only requires an App ID for some complex integrations. If you need one, contact iFixit API support at `api@ifixit.com`, then store it as `IFIXIT_APP_ID` or rotate several with `IFIXIT_APP_IDS=app1,app2`.
 
 ### Step 5: Run the Server
 

@@ -13,6 +13,7 @@ export interface Conversation {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: string[];
 }
 
 function authHeaders() {
@@ -33,6 +34,25 @@ function getLocalConversations(): Conversation[] {
 function setLocalConversations(conversations: Conversation[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations.slice(0, 50)));
+}
+
+function localMessagesKey(threadId: string) {
+  return `${STORAGE_KEYS.CONVERSATION_MESSAGES}:${threadId}`;
+}
+
+function getLocalMessages(threadId: string): ChatMessage[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(localMessagesKey(threadId));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveMessagesToLocal(threadId: string, messages: ChatMessage[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(localMessagesKey(threadId), JSON.stringify(messages.slice(-100)));
 }
 
 export function saveConversationToLocal(threadId: string, title: string) {
@@ -60,6 +80,8 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
     const data = await response.json();
     const conversations = (data.conversations || []) as Conversation[];
+    if (conversations.length === 0 && local.length > 0) return local;
+
     setLocalConversations(conversations);
     return conversations;
   } catch {
@@ -69,19 +91,24 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
 export async function fetchConversationMessages(threadId: string): Promise<ChatMessage[]> {
   const headers = authHeaders();
-  if (!headers) return [];
+  const local = getLocalMessages(threadId);
+  if (!headers) return local;
 
   try {
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CHAT_MESSAGES(threadId)}`,
       { headers },
     );
-    if (!response.ok) return [];
+    if (!response.ok) return local;
 
     const data = await response.json();
-    return (data.messages || []) as ChatMessage[];
+    const messages = (data.messages || []) as ChatMessage[];
+    if (messages.length === 0 && local.length > 0) return local;
+
+    saveMessagesToLocal(threadId, messages);
+    return messages;
   } catch {
-    return [];
+    return local;
   }
 }
 
@@ -138,4 +165,7 @@ export async function deleteConversation(threadId: string): Promise<void> {
 
   const list = getLocalConversations().filter((conversation) => conversation.thread_id !== threadId);
   setLocalConversations(list);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(localMessagesKey(threadId));
+  }
 }

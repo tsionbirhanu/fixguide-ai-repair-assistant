@@ -10,29 +10,110 @@ import re
 import httpx
 from langchain_core.tools import tool
 
+from app.core.api_keys import get_next_ifixit_app_id
+
+
+PROBLEM_WORDS = {
+    "back",
+    "battery",
+    "broken",
+    "button",
+    "camera",
+    "charge",
+    "charging",
+    "crack",
+    "cracked",
+    "display",
+    "drift",
+    "fix",
+    "glass",
+    "issue",
+    "keyboard",
+    "lcd",
+    "not",
+    "overheating",
+    "port",
+    "problem",
+    "repair",
+    "replace",
+    "replacement",
+    "screen",
+    "shattered",
+    "speaker",
+    "touch",
+    "trackpad",
+    "working",
+    "wont",
+    "won",
+    "turn",
+    "power",
+}
+STOP_PHRASES = [
+    "how do i",
+    "how to",
+    "please",
+    "my",
+    "the",
+    "a",
+    "an",
+]
+CONNECTOR_WORDS = {"to", "for", "with", "and", "on"}
+GENERIC_DEVICE_WORDS = {
+    "cell",
+    "cellphone",
+    "device",
+    "devices",
+    "electronics",
+    "mobile",
+    "mobiles",
+    "phone",
+    "phones",
+    "smartphone",
+    "smartphones",
+}
+
+
+def _ifixit_headers() -> Optional[Dict[str, str]]:
+    """Attach an optional iFixit App ID when one is configured."""
+    app_id = get_next_ifixit_app_id()
+    if not app_id:
+        return None
+    return {"X-App-Id": app_id}
+
+
+def _extract_media_image_url(media: Dict[str, Any]) -> str:
+    """Return the best displayable URL from an iFixit media item."""
+    image = media.get("image") if isinstance(media.get("image"), dict) else media
+    for size in ("standard", "large", "medium", "thumbnail", "original"):
+        image_url = image.get(size)
+        if image_url and image_url.startswith(("http://", "https://")):
+            return image_url
+    return ""
+
 
 async def search_device(query: str) -> Optional[Dict[str, Any]]:
     """Search for a device on iFixit and return the first matching device."""
-    url = f"https://www.ifixit.com/api/2.0/search/{quote(query, safe='')}"
-    params = {"filter": "device"}
-
     async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
+        for device_query in build_device_search_queries(query):
+            url = f"https://www.ifixit.com/api/2.0/search/{quote(device_query, safe='')}"
+            params = {"filter": "device"}
 
-            if data.get("results"):
-                device = data["results"][0]
-                return {
-                    "title": device.get("title", ""),
-                    "url": device.get("url", ""),
-                    "wiki_title": device.get("wiki_title", device.get("title", "")),
-                }
-            return None
-        except Exception as e:
-            print(f"Error searching device: {e}")
-            return None
+            try:
+                response = await client.get(url, params=params, headers=_ifixit_headers())
+                response.raise_for_status()
+                data = response.json()
+
+                if data.get("results"):
+                    device = data["results"][0]
+                    return {
+                        "title": device.get("title", ""),
+                        "url": device.get("url", ""),
+                        "wiki_title": device.get("wiki_title", device.get("title", "")),
+                        "matched_query": device_query,
+                    }
+            except Exception as e:
+                print(f"Error searching device '{device_query}': {e}")
+        return None
 
 
 async def list_repair_guides(device_title: str) -> List[Dict[str, Any]]:
@@ -42,7 +123,7 @@ async def list_repair_guides(device_title: str) -> List[Dict[str, Any]]:
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.get(url)
+            response = await client.get(url, headers=_ifixit_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -69,7 +150,7 @@ async def get_repair_guide_details(guide_id: int) -> Optional[Dict[str, Any]]:
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.get(url)
+            response = await client.get(url, headers=_ifixit_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -112,11 +193,12 @@ async def get_repair_guide_details(guide_id: int) -> Optional[Dict[str, Any]]:
                     if line.get("text_rendered"):
                         step_data["lines"].append(line["text_rendered"])
 
+                seen_images = set()
                 for media in step.get("media", {}).get("data", []):
-                    if media.get("image"):
-                        image_url = media["image"].get("standard", "")
-                        if image_url:
-                            step_data["images"].append(image_url)
+                    image_url = _extract_media_image_url(media)
+                    if image_url and image_url not in seen_images:
+                        seen_images.add(image_url)
+                        step_data["images"].append(image_url)
 
                 cleaned_guide["steps"].append(step_data)
 
@@ -199,6 +281,58 @@ def _query_tokens(text: str) -> set:
     return {token for token in re.findall(r"[a-z0-9]+", text.lower()) if token not in ignored}
 
 
+def _device_tokens_from_query(query: str) -> List[str]:
+    """Extract likely device tokens after removing repair issue words."""
+    normalized = " ".join((query or "").split())
+    normalized = normalized.replace("won't", "wont").replace("doesn't", "doesnt")
+    normalized = re.sub(r"[?!.:,;]+", " ", normalized)
+    lowered = normalized.lower()
+
+    for phrase in STOP_PHRASES:
+        lowered = re.sub(rf"\b{re.escape(phrase)}\b", " ", lowered)
+
+    tokens = re.findall(r"[a-z0-9+]+", lowered)
+    return [
+        token
+        for token in tokens
+        if token not in PROBLEM_WORDS and token not in CONNECTOR_WORDS
+    ]
+
+
+def _needs_specific_device(query: str) -> bool:
+    """Return True when a query is too broad to map to an iFixit device."""
+    device_tokens = _device_tokens_from_query(query)
+    return not device_tokens or all(token in GENERIC_DEVICE_WORDS for token in device_tokens)
+
+
+def build_device_search_queries(query: str) -> List[str]:
+    """Build iFixit device-search candidates from a device plus problem query."""
+    raw = " ".join((query or "").split())
+    if not raw:
+        return []
+
+    candidates = [raw]
+    device_tokens = _device_tokens_from_query(raw)
+    if device_tokens:
+        candidates.append(" ".join(device_tokens))
+
+    # Most iFixit device searches work best as brand/model, e.g. "iPhone 13".
+    if len(device_tokens) >= 2:
+        candidates.append(" ".join(device_tokens[:2]))
+    if len(device_tokens) >= 3:
+        candidates.append(" ".join(device_tokens[:3]))
+
+    unique_candidates = []
+    seen = set()
+    for candidate in candidates:
+        clean_candidate = " ".join(candidate.split())
+        key = clean_candidate.lower()
+        if clean_candidate and key not in seen:
+            seen.add(key)
+            unique_candidates.append(clean_candidate)
+    return unique_candidates
+
+
 def _score_guide(guide: Dict[str, Any], query_tokens: set) -> int:
     """Score guide relevance using title and subject token overlap."""
     searchable = f"{guide.get('title', '')} {guide.get('subject', '')}"
@@ -226,6 +360,13 @@ async def search_ifixit_repair_guide(device_query: str) -> str:
     Returns:
         Formatted repair guide in Markdown, or a not-found message.
     """
+    if _needs_specific_device(device_query):
+        return (
+            "Need device model: this repair request is too broad for a verified iFixit guide. "
+            "Please include the exact phone model, for example `iPhone 13 screen replacement`, "
+            "`Samsung Galaxy S21 screen replacement`, or `Google Pixel 7 cracked screen`."
+        )
+
     device = await search_device(device_query)
 
     if not device:
