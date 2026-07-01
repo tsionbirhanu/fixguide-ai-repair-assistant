@@ -56,7 +56,7 @@ API_PORT=8000
 DEBUG=true
 
 # CORS Origins (comma-separated)
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,https://fixguide-ai-repair-assistant.vercel.app
 
 # Google Gemini AI
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -341,7 +341,7 @@ data: {"type": "done", "thread_id": "123"}
 DEBUG=false
 API_HOST=0.0.0.0
 API_PORT=8000
-CORS_ORIGINS=https://yourdomain.com
+CORS_ORIGINS=https://fixguide-ai-repair-assistant.vercel.app
 ```
 
 ### Recommended Services

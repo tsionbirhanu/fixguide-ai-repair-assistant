@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://fixguide-ai-repair-assistant.vercel.app",
+]
+
 
 class Settings(BaseSettings):
     """
@@ -23,7 +29,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # CORS Configuration
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ORIGINS: str = ",".join(DEFAULT_CORS_ORIGINS)
     
     # LangGraph Configuration
     LANGCHAIN_API_KEY: str = ""
@@ -88,7 +94,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS_ORIGINS into a list"""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        origins = []
+        for origin in [*DEFAULT_CORS_ORIGINS, *(self.CORS_ORIGINS or "").split(",")]:
+            clean_origin = origin.strip().rstrip("/")
+            if clean_origin and clean_origin not in origins:
+                origins.append(clean_origin)
+        return origins
 
     @staticmethod
     def _split_keys(value: str) -> List[str]:

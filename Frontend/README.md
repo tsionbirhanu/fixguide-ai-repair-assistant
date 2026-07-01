@@ -1,6 +1,6 @@
 # FixGuide AI - Frontend
 
-A premium, ChatGPT-style UI for FixGuide AI - your AI-powered device repair assistant.
+A premium conversational UI for FixGuide AI - your AI-powered device repair assistant.
 
 ## 🎨 Design System
 
