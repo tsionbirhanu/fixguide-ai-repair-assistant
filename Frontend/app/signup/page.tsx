@@ -43,10 +43,10 @@ export default function SignupPage() {
         // Don't auto-login: clear any token so user must sign in on login page
         localStorage.removeItem("access_token");
         localStorage.removeItem("user");
-        setSuccess("Account created! Redirecting to sign in...");
+        setSuccess(response.message || "Account created. Check your email if confirmation is required.");
         setTimeout(() => {
           router.push(`/login?email=${encodeURIComponent(email)}&signedup=1`);
-        }, 1500);
+        }, 3000);
       } else {
         // Show error message from backend or default message
         setError(
@@ -57,9 +57,7 @@ export default function SignupPage() {
       }
     } catch (err) {
       console.error("Signup error:", err);
-      setError(
-        "Network error. Please check if the backend server is running on http://localhost:8000",
-      );
+      setError("Could not reach FixGuide AI right now. Please wait a moment and try again.");
     } finally {
       setLoading(false);
     }
@@ -86,6 +84,9 @@ export default function SignupPage() {
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                 <p className="text-sm text-red-600 dark:text-red-400">
                   {error}
+                </p>
+                <p className="mt-2 text-xs text-red-500 dark:text-red-300">
+                  Already created an account? Use the sign-in page instead.
                 </p>
               </div>
             )}

@@ -11,7 +11,7 @@ from app.agent.ifixit_tool import (
     select_best_guide,
 )
 from app.api import chat
-from app.core.auth import _demo_users, auth_service
+from app.core.auth import _demo_users, _extract_error_message, auth_service
 from app.core.config import Settings, settings
 from app.core.api_keys import RoundRobinKeyRing
 from app.main import app
@@ -150,6 +150,28 @@ class DemoAuthTests(unittest.TestCase):
 
         self.assertEqual(user["id"], token)
         self.assertEqual(user["email"], "demo@local.dev")
+
+
+class AuthMessageTests(unittest.TestCase):
+    class FakeAuthError(Exception):
+        def __init__(self, msg):
+            self.msg = msg
+            super().__init__(msg)
+
+    def test_invalid_login_error_is_friendly(self):
+        message = _extract_error_message(self.FakeAuthError("Invalid login credentials"))
+
+        self.assertIn("Email or password is incorrect", message)
+
+    def test_unconfirmed_email_error_is_friendly(self):
+        message = _extract_error_message(self.FakeAuthError("Email not confirmed"))
+
+        self.assertIn("confirm your email", message.lower())
+
+    def test_registered_email_error_is_friendly(self):
+        message = _extract_error_message(self.FakeAuthError("User already registered"))
+
+        self.assertIn("already registered", message)
 
 
 class DemoConversationApiTests(unittest.TestCase):

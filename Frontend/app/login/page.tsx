@@ -25,7 +25,9 @@ function LoginForm() {
     const emailParam = searchParams.get("email");
     const fromSignup = searchParams.get("signedup");
     if (emailParam) setEmail(decodeURIComponent(emailParam));
-    if (fromSignup === "1") setSuccess("Account created. Sign in to continue to chat.");
+    if (fromSignup === "1") {
+      setSuccess("Account created. If your project requires email confirmation, verify your inbox before signing in.");
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,9 +51,7 @@ function LoginForm() {
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError(
-        "Network error. Please check if the backend server is running on http://localhost:8000",
-      );
+      setError("Could not reach FixGuide AI right now. Please wait a moment and try again.");
     } finally {
       setLoading(false);
     }
@@ -93,6 +93,9 @@ function LoginForm() {
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                 <p className="text-sm text-red-600 dark:text-red-400">
                   {error}
+                </p>
+                <p className="mt-2 text-xs text-red-500 dark:text-red-300">
+                  New account? Confirm your email if Supabase sent a verification message.
                 </p>
               </div>
             )}

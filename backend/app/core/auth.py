@@ -56,23 +56,34 @@ def _serialize_obj(obj) -> Optional[dict]:
 
 def _extract_error_message(exc: Exception) -> str:
     """Extract user-friendly error message from auth exceptions."""
-    msg = str(exc)
-    # AuthApiError may have structured message
+    msg = ""
     if hasattr(exc, "msg") and exc.msg:
-        return exc.msg
-    if hasattr(exc, "message") and exc.message:
-        return exc.message
+        msg = str(exc.msg)
+    elif hasattr(exc, "message") and exc.message:
+        msg = str(exc.message)
+    else:
+        msg = str(exc)
+
+    normalized = msg.lower()
+
     # Network/DNS errors (getaddrinfo failed = cannot resolve hostname or no internet)
-    if "getaddrinfo failed" in msg or "11001" in msg or "errno 11001" in msg.lower():
+    if "getaddrinfo failed" in normalized or "11001" in msg or "errno 11001" in normalized:
         return "Cannot connect to Supabase. Check your internet connection and that SUPABASE_URL in .env is correct (e.g. https://xxx.supabase.co)."
-    if "connection" in msg.lower() and ("refused" in msg.lower() or "failed" in msg.lower() or "reset" in msg.lower()):
+    if "connection" in normalized and ("refused" in normalized or "failed" in normalized or "reset" in normalized):
         return "Cannot reach Supabase. Please check your internet connection."
+
     # Common Supabase error patterns - make them more user-friendly
-    if "already registered" in msg.lower() or "already been registered" in msg.lower():
+    if "already registered" in normalized or "already been registered" in normalized or "already exists" in normalized:
         return "This email is already registered. Please sign in instead."
-    if "invalid login" in msg.lower() or "invalid_credentials" in msg.lower():
-        return "Invalid email or password. Please try again."
-    if "password" in msg.lower() and ("short" in msg.lower() or "least" in msg.lower()):
+    if "email not confirmed" in normalized or "email_not_confirmed" in normalized or "confirm" in normalized:
+        return "Please confirm your email address before signing in. Check your inbox or spam folder."
+    if "invalid login" in normalized or "invalid_credentials" in normalized or "invalid email or password" in normalized:
+        return "Email or password is incorrect. If you just signed up, confirm your email first, then sign in."
+    if "signup" in normalized and "disabled" in normalized:
+        return "New account signup is currently disabled for this project."
+    if "email" in normalized and ("invalid" in normalized or "not valid" in normalized):
+        return "Please enter a valid email address."
+    if "password" in normalized and ("short" in normalized or "least" in normalized):
         return "Password must be at least 6 characters long."
     return msg if msg else "Authentication failed. Please try again."
 
