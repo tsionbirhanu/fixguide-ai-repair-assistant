@@ -3,12 +3,12 @@ LangGraph Agent for Repair Assistant
 Uses Gemini AI with iFixit and web search tools
 """
 
-from typing import Annotated, TypedDict, Literal
+from typing import Literal
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage
 from app.core.config import settings
 from app.agent.ifixit_tool import search_ifixit_repair_guide
 from app.agent.web_search_tool import search_web_for_repair_solution
@@ -46,6 +46,12 @@ class AgentState(MessagesState):
     user_id: str = ""
 
 
+_DEFAULT_CHECKPOINTER = MemorySaver()
+_DEFAULT_COMPILED_AGENT = None
+_NO_CHECKPOINT_COMPILED_AGENT = None
+_USE_DEFAULT_CHECKPOINTER = object()
+
+
 def create_agent():
     """
     Create the LangGraph agent with tools
@@ -55,7 +61,7 @@ def create_agent():
         raise ValueError("GEMINI_API_KEY not configured in .env file")
     
     model = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.5-flash",
         google_api_key=settings.GEMINI_API_KEY,
         temperature=0.2,  # Lower temperature for more factual responses
         streaming=True
@@ -112,39 +118,28 @@ def create_agent():
 
 
 async def get_checkpointer():
-    """
-    Create checkpointer for conversation persistence
-    Currently uses in-memory storage for development
-    
-    For production with PostgreSQL:
-    1. Install: pip install psycopg[binary]
-    2. Uncomment PostgreSQL code below
-    3. Add DB password to connection string
-    """
-    # Use in-memory checkpointing
-    return MemorySaver()
-    
-    # TODO: Enable for production with PostgreSQL
-    # from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    # if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
-    #     raise ValueError("Supabase credentials not configured")
-    # 
-    # host = settings.SUPABASE_URL.replace("https://", "").replace("http://", "")
-    # connection_string = f"postgresql://postgres.{host.split('.')[0]}:[YOUR_DB_PASSWORD]@{host}:5432/postgres"
-    # 
-    # checkpointer = AsyncPostgresSaver.from_conn_string(connection_string)
-    # await checkpointer.setup()
-    # return checkpointer
+    """Return the process-local checkpointer used by default."""
+    return _DEFAULT_CHECKPOINTER
 
 
-def compile_agent(checkpointer=None):
+def compile_agent(checkpointer=_USE_DEFAULT_CHECKPOINTER):
     """
-    Compile the agent workflow with optional checkpointer
+    Compile the agent workflow.
+
+    By default the compiled graph uses a process-local MemorySaver. Passing
+    checkpointer=None compiles a graph without checkpointing, which is useful
+    when the caller explicitly supplies persisted message history.
     """
-    workflow = create_agent()
-    
-    if checkpointer:
-        return workflow.compile(checkpointer=checkpointer)
-    else:
-        # Use in-memory checkpointing
-        return workflow.compile(checkpointer=MemorySaver())
+    global _DEFAULT_COMPILED_AGENT, _NO_CHECKPOINT_COMPILED_AGENT
+
+    if checkpointer is _USE_DEFAULT_CHECKPOINTER:
+        if _DEFAULT_COMPILED_AGENT is None:
+            _DEFAULT_COMPILED_AGENT = create_agent().compile(checkpointer=_DEFAULT_CHECKPOINTER)
+        return _DEFAULT_COMPILED_AGENT
+
+    if checkpointer is None:
+        if _NO_CHECKPOINT_COMPILED_AGENT is None:
+            _NO_CHECKPOINT_COMPILED_AGENT = create_agent().compile()
+        return _NO_CHECKPOINT_COMPILED_AGENT
+
+    return create_agent().compile(checkpointer=checkpointer)

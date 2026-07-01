@@ -3,22 +3,82 @@ Supabase Authentication Service
 Handles user signup, login, and session management
 """
 
+import re
+import uuid
 from typing import Optional, Dict
 from supabase import create_client, Client
 from app.core.config import settings
+
+# In-memory store for demo auth users (token -> user dict)
+_demo_users: Dict[str, Dict] = {}
+
+def _serialize_obj(obj) -> Optional[dict]:
+    """Safely serialize Supabase response objects to dict."""
+    if obj is None:
+        return None
+    try:
+        return obj.model_dump() if hasattr(obj, "model_dump") else obj.dict()
+    except Exception:
+        return {"id": getattr(obj, "id", None), "email": getattr(obj, "email", None)}
+
+
+def _extract_error_message(exc: Exception) -> str:
+    """Extract user-friendly error message from auth exceptions."""
+    msg = str(exc)
+    # AuthApiError may have structured message
+    if hasattr(exc, "msg") and exc.msg:
+        return exc.msg
+    if hasattr(exc, "message") and exc.message:
+        return exc.message
+    # Network/DNS errors (getaddrinfo failed = cannot resolve hostname or no internet)
+    if "getaddrinfo failed" in msg or "11001" in msg or "errno 11001" in msg.lower():
+        return "Cannot connect to Supabase. Check your internet connection and that SUPABASE_URL in .env is correct (e.g. https://xxx.supabase.co)."
+    if "connection" in msg.lower() and ("refused" in msg.lower() or "failed" in msg.lower() or "reset" in msg.lower()):
+        return "Cannot reach Supabase. Please check your internet connection."
+    # Common Supabase error patterns - make them more user-friendly
+    if "already registered" in msg.lower() or "already been registered" in msg.lower():
+        return "This email is already registered. Please sign in instead."
+    if "invalid login" in msg.lower() or "invalid_credentials" in msg.lower():
+        return "Invalid email or password. Please try again."
+    if "password" in msg.lower() and ("short" in msg.lower() or "least" in msg.lower()):
+        return "Password must be at least 6 characters long."
+    return msg if msg else "Authentication failed. Please try again."
+
+
 
 
 class AuthService:
     """Supabase authentication service"""
     
     def __init__(self):
-        if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
-            raise ValueError("Supabase credentials not configured in .env")
-        
-        self.client: Client = create_client(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_ANON_KEY
-        )
+        self._client: Optional[Client] = None
+        self._admin_client: Optional[Client] = None
+    
+    @property
+    def client(self) -> Client:
+        if self._client is None:
+            if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+                raise ValueError(
+                    "Supabase credentials not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to .env"
+                )
+            self._client = create_client(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_ANON_KEY
+            )
+        return self._client
+
+    @property
+    def admin_client(self) -> Client:
+        if self._admin_client is None:
+            if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+                raise ValueError(
+                    "Supabase service credentials not configured. Add SUPABASE_SERVICE_KEY to .env"
+                )
+            self._admin_client = create_client(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_SERVICE_KEY
+            )
+        return self._admin_client
     
     async def signup(self, email: str, password: str) -> Dict:
         """
@@ -31,23 +91,47 @@ class AuthService:
         Returns:
             Dict with user data and session
         """
+        # Input validation
+        email = (email or "").strip()
+        if not email:
+            return {"success": False, "error": "Email is required", "message": "Please enter your email."}
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+            return {"success": False, "error": "Invalid email format", "message": "Please enter a valid email address."}
+        if not password or len(password) < 6:
+            return {"success": False, "error": "Password too short", "message": "Password must be at least 6 characters long."}
+
+        # Demo auth - bypass Supabase when unreachable (local dev, no internet)
+        if settings.DEMO_AUTH:
+            demo_token = f"demo_{uuid.uuid4().hex}"
+            demo_user = {"id": demo_token, "email": email}
+            _demo_users[demo_token] = demo_user
+            return {
+                "success": True,
+                "user": demo_user,
+                "session": {"access_token": demo_token},
+                "access_token": demo_token,
+                "message": "Signup successful (demo mode)."
+            }
+
         try:
             response = self.client.auth.sign_up({
                 "email": email,
                 "password": password
             })
             
+            access_token = response.session.access_token if response.session else None
             return {
                 "success": True,
-                "user": response.user.model_dump() if response.user else None,
-                "session": response.session.model_dump() if response.session else None,
+                "user": _serialize_obj(response.user),
+                "session": _serialize_obj(response.session),
+                "access_token": access_token,
                 "message": "Signup successful. Please check your email for verification."
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": str(e),
-                "message": "Signup failed"
+                "error": _extract_error_message(e),
+                "message": _extract_error_message(e)
             }
     
     async def login(self, email: str, password: str) -> Dict:
@@ -61,24 +145,45 @@ class AuthService:
         Returns:
             Dict with user data and session token
         """
+        # Input validation
+        email = (email or "").strip()
+        if not email:
+            return {"success": False, "error": "Email is required", "message": "Please enter your email."}
+        if not password:
+            return {"success": False, "error": "Password is required", "message": "Please enter your password."}
+
+        # Demo auth - bypass Supabase when unreachable
+        if settings.DEMO_AUTH:
+            demo_token = f"demo_{uuid.uuid4().hex}"
+            demo_user = {"id": demo_token, "email": email}
+            _demo_users[demo_token] = demo_user
+            return {
+                "success": True,
+                "user": demo_user,
+                "session": {"access_token": demo_token},
+                "access_token": demo_token,
+                "message": "Login successful (demo mode)."
+            }
+
         try:
             response = self.client.auth.sign_in_with_password({
                 "email": email,
                 "password": password
             })
             
+            access_token = response.session.access_token if response.session else None
             return {
                 "success": True,
-                "user": response.user.model_dump() if response.user else None,
-                "session": response.session.model_dump() if response.session else None,
-                "access_token": response.session.access_token if response.session else None,
+                "user": _serialize_obj(response.user),
+                "session": _serialize_obj(response.session),
+                "access_token": access_token,
                 "message": "Login successful"
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": str(e),
-                "message": "Login failed. Please check your credentials."
+                "error": _extract_error_message(e),
+                "message": _extract_error_message(e)
             }
     
     async def logout(self, access_token: str) -> Dict:
@@ -91,8 +196,15 @@ class AuthService:
         Returns:
             Dict with success status
         """
+        if settings.DEMO_AUTH and access_token and access_token.startswith("demo_"):
+            _demo_users.pop(access_token, None)
+            return {"success": True, "message": "Logout successful"}
+        
         try:
-            self.client.auth.sign_out()
+            if settings.SUPABASE_SERVICE_KEY:
+                self.admin_client.auth.admin.sign_out(access_token)
+            else:
+                self.client.auth.sign_out()
             return {
                 "success": True,
                 "message": "Logout successful"
@@ -109,11 +221,15 @@ class AuthService:
         Get current user from access token
         
         Args:
-            access_token: JWT access token
+            access_token: JWT access token or demo token
         
         Returns:
             User data or None
         """
+        # Demo auth - accept demo tokens
+        if settings.DEMO_AUTH and access_token and access_token.startswith("demo_"):
+            return _demo_users.get(access_token)
+        
         try:
             response = self.client.auth.get_user(access_token)
             return response.user.model_dump() if response.user else None
