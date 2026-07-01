@@ -1,0 +1,132 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: rgb(var(--sidebar-ring));
+  --color-sidebar-border: rgb(var(--sidebar-border));
+  --color-sidebar-accent-foreground: rgb(var(--sidebar-accent-foreground));
+  --color-sidebar-accent: rgb(var(--sidebar-accent));
+  --color-sidebar-primary-foreground: rgb(var(--sidebar-primary-foreground));
+  --color-sidebar-primary: rgb(var(--sidebar-primary));
+  --color-sidebar-foreground: rgb(var(--sidebar-foreground));
+  --color-sidebar: rgb(var(--sidebar));
+  --color-chart-5: rgb(var(--chart-5));
+  --color-chart-4: rgb(var(--chart-4));
+  --color-chart-3: rgb(var(--chart-3));
+  --color-chart-2: rgb(var(--chart-2));
+  --color-chart-1: rgb(var(--chart-1));
+  --color-ring: rgb(var(--ring));
+  --color-input: rgb(var(--input));
+  --color-border: rgb(var(--border));
+  --color-destructive: rgb(var(--destructive));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-accent: rgb(var(--accent));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+  --color-secondary: rgb(var(--secondary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-primary: rgb(var(--primary));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+  --color-popover: rgb(var(--popover));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-card: rgb(var(--card));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.5rem;
+  --user-bubble: 255 138 101;
+  --assistant-bubble: 31 41 55;
+  /* Soft Orange: #FF8A65 / Deep Gray: #1F2937 / White: #FFFFFF / Black: #0F0F0F */
+  --background: 255 255 255; /* White */
+  --foreground: 15 15 15; /* Black */
+  --card: 255 255 255; /* White */
+  --card-foreground: 15 15 15; /* Black */
+  --popover: 255 255 255; /* White */
+  --popover-foreground: 15 15 15; /* Black */
+  --primary: 255 138 101; /* Soft Orange */
+  --primary-foreground: 255 255 255; /* White */
+  --secondary: 31 41 55; /* Deep Gray */
+  --secondary-foreground: 255 255 255; /* White */
+  --muted: 249 250 251; /* Very Light Gray */
+  --muted-foreground: 107 114 128; /* Medium Gray */
+  --accent: 255 138 101; /* Soft Orange */
+  --accent-foreground: 255 255 255; /* White */
+  --destructive: 239 68 68; /* Red for errors */
+  --border: 229 231 235; /* Light Gray Border */
+  --input: 229 231 235; /* Light Gray Input */
+  --ring: 255 138 101; /* Soft Orange */
+  --chart-1: 255 138 101;
+  --chart-2: 31 41 55;
+  --chart-3: 107 114 128;
+  --chart-4: 249 250 251;
+  --chart-5: 255 170 145;
+  --sidebar: 31 41 55; /* Deep Gray */
+  --sidebar-foreground: 255 255 255; /* White */
+  --sidebar-primary: 255 138 101; /* Soft Orange */
+  --sidebar-primary-foreground: 255 255 255; /* White */
+  --sidebar-accent: 55 65 81; /* Slightly lighter gray */
+  --sidebar-accent-foreground: 255 255 255; /* White */
+  --sidebar-border: 55 65 81; /* Border */
+  --sidebar-ring: 255 138 101; /* Soft Orange */
+}
+
+/* ChatGPT-style dark theme */
+.dark {
+  --background: 32 33 35; /* #202123 ChatGPT main bg */
+  --foreground: 236 236 241; /* #ececf1 */
+  --card: 43 44 47; /* #2b2c2f */
+  --card-foreground: 236 236 241;
+  --popover: 43 44 47;
+  --popover-foreground: 236 236 241;
+  --primary: 16 163 127; /* ChatGPT green #10a37f */
+  --primary-foreground: 255 255 255;
+  --secondary: 68 70 84; /* #444654 message bubble */
+  --secondary-foreground: 236 236 241;
+  --muted: 68 70 84;
+  --muted-foreground: 142 142 160; /* #8e8ea0 */
+  --accent: 16 163 127;
+  --accent-foreground: 255 255 255;
+  --destructive: 239 68 68;
+  --border: 68 70 84;
+  --input: 68 70 84;
+  --ring: 16 163 127;
+  --chart-1: 16 163 127;
+  --chart-2: 43 44 47;
+  --chart-3: 142 142 160;
+  --chart-4: 68 70 84;
+  --chart-5: 16 163 127;
+  --sidebar: 32 33 35; /* Same as bg */
+  --sidebar-foreground: 236 236 241;
+  --sidebar-primary: 16 163 127;
+  --sidebar-primary-foreground: 255 255 255;
+  --sidebar-accent: 43 44 47;
+  --sidebar-accent-foreground: 236 236 241;
+  --sidebar-border: 68 70 84;
+  --sidebar-ring: 16 163 127;
+  --user-bubble: 16 163 127; /* ChatGPT user message green */
+  --assistant-bubble: 68 70 84; /* ChatGPT assistant gray */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
