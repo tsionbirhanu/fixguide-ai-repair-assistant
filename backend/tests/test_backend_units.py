@@ -173,6 +173,12 @@ class AuthMessageTests(unittest.TestCase):
 
         self.assertIn("already registered", message)
 
+    def test_dns_error_is_friendly(self):
+        message = _extract_error_message(self.FakeAuthError("[Errno -2] Name or service not known"))
+
+        self.assertIn("Supabase hostname cannot be found", message)
+        self.assertIn("SUPABASE_URL", message)
+
 
 class DemoConversationApiTests(unittest.TestCase):
     def setUp(self):

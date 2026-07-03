@@ -64,6 +64,15 @@ function friendlyAuthError(message: string, mode: "login" | "signup"): string {
     return "Could not reach the FixGuide AI backend. Please wait a moment and try again.";
   }
 
+  if (
+    normalized.includes("name or service not known") ||
+    normalized.includes("errno -2") ||
+    normalized.includes("hostname cannot be found") ||
+    normalized.includes("getaddrinfo")
+  ) {
+    return "FixGuide AI cannot connect to Supabase. Check the deployed SUPABASE_URL on Render; it must look like https://your-project-ref.supabase.co.";
+  }
+
   return text;
 }
 

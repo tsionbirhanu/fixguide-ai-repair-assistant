@@ -67,8 +67,18 @@ def _extract_error_message(exc: Exception) -> str:
     normalized = msg.lower()
 
     # Network/DNS errors (getaddrinfo failed = cannot resolve hostname or no internet)
-    if "getaddrinfo failed" in normalized or "11001" in msg or "errno 11001" in normalized:
-        return "Cannot connect to Supabase. Check your internet connection and that SUPABASE_URL in .env is correct (e.g. https://xxx.supabase.co)."
+    if (
+        "getaddrinfo failed" in normalized
+        or "name or service not known" in normalized
+        or "temporary failure in name resolution" in normalized
+        or "errno -2" in normalized
+        or "11001" in msg
+        or "errno 11001" in normalized
+    ):
+        return (
+            "Cannot connect to Supabase because the Supabase hostname cannot be found. "
+            "Check the deployed SUPABASE_URL value. It must look like https://your-project-ref.supabase.co with no quotes, spaces, or extra path."
+        )
     if "connection" in normalized and ("refused" in normalized or "failed" in normalized or "reset" in normalized):
         return "Cannot reach Supabase. Please check your internet connection."
 
@@ -162,12 +172,17 @@ class AuthService:
             })
             
             access_token = response.session.access_token if response.session else None
+            message = (
+                "Signup successful. You can continue now."
+                if access_token
+                else "Signup successful. Please check your email to verify your account before signing in."
+            )
             return {
                 "success": True,
                 "user": _serialize_obj(response.user),
                 "session": _serialize_obj(response.session),
                 "access_token": access_token,
-                "message": "Signup successful. Please check your email for verification."
+                "message": message
             }
         except Exception as e:
             return {

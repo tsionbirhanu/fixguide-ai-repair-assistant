@@ -40,13 +40,19 @@ export default function SignupPage() {
       const response = await authService.signup(email, password);
 
       if (response.success) {
-        // Don't auto-login: clear any token so user must sign in on login page
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        setSuccess(response.message || "Account created. Check your email if confirmation is required.");
-        setTimeout(() => {
-          router.push(`/login?email=${encodeURIComponent(email)}&signedup=1`);
-        }, 3000);
+        if (response.access_token) {
+          setSuccess(response.message || "Account created. Taking you to chat...");
+          setTimeout(() => {
+            router.push("/chat");
+          }, 800);
+        } else {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user");
+          setSuccess(response.message || "Account created. Check your email to verify your account.");
+          setTimeout(() => {
+            router.push(`/login?email=${encodeURIComponent(email)}&signedup=1`);
+          }, 3000);
+        }
       } else {
         // Show error message from backend or default message
         setError(

@@ -26,7 +26,7 @@ function LoginForm() {
     const fromSignup = searchParams.get("signedup");
     if (emailParam) setEmail(decodeURIComponent(emailParam));
     if (fromSignup === "1") {
-      setSuccess("Account created. If your project requires email confirmation, verify your inbox before signing in.");
+      setSuccess("Account created. If Supabase email confirmation is enabled, verify your inbox before signing in.");
     }
   }, [searchParams]);
 

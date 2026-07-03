@@ -7,10 +7,19 @@ import { useRouter } from "next/navigation";
 import {
   BarChart3,
   Blocks,
+  BookOpen,
   Camera,
   Check,
   ChevronRight,
+  CircleCheck,
+  Database,
+  ExternalLink,
+  FolderKanban,
+  Gamepad2,
+  Globe2,
+  HelpCircle,
   ImagePlus,
+  Laptop,
   Library,
   LogOut,
   Mic,
@@ -21,13 +30,19 @@ import {
   Pencil,
   SendHorizontal,
   Search,
+  Settings,
   Share2,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
   Sun,
   Trash2,
+  Wrench,
   X,
   MessageCircle,
   MoreHorizontal,
   SquarePen,
+  type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { MessageBubble } from "@/components/MessageBubble";
@@ -49,6 +64,96 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Message, SSEEvent } from "@/lib/types";
 
+type SidebarPanel = "chats" | "library" | "apps" | "more";
+
+type RepairProject = {
+  title: string;
+  description: string;
+  prompt: string;
+  icon: LucideIcon;
+};
+
+type SidebarActionItem = {
+  title: string;
+  description: string;
+  prompt: string;
+  icon: LucideIcon;
+};
+
+const REPAIR_PROJECTS: RepairProject[] = [
+  {
+    title: "Phone Repairs",
+    description: "Screens, batteries, ports",
+    prompt: "Help me plan a phone repair. Ask me for the exact model and the broken part first.",
+    icon: Smartphone,
+  },
+  {
+    title: "Console Repairs",
+    description: "Overheating, power, drift",
+    prompt: "Help me troubleshoot a game console repair. Start by asking for the console model and symptoms.",
+    icon: Gamepad2,
+  },
+  {
+    title: "Computer Repairs",
+    description: "Keyboards, charging, startup",
+    prompt: "Help me diagnose a computer repair. Ask for the device model, symptoms, and recent changes.",
+    icon: Laptop,
+  },
+];
+
+const LIBRARY_ITEMS: SidebarActionItem[] = [
+  {
+    title: "Screen Replacement",
+    description: "Find model-specific screen guides",
+    prompt: "Find an official screen replacement guide. Ask me for the exact device model if I do not provide it.",
+    icon: BookOpen,
+  },
+  {
+    title: "Battery Replacement",
+    description: "Tools, parts, and safety checks",
+    prompt: "Find an official battery replacement guide. Include safety warnings and required tools.",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Charging Issue",
+    description: "Port, cable, battery diagnosis",
+    prompt: "Help me troubleshoot a device that will not charge. Ask for the model and symptoms first.",
+    icon: Wrench,
+  },
+];
+
+const APP_TOOLS: Array<{
+  title: string;
+  description: string;
+  status: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: "iFixit Guides",
+    description: "Official repair steps and images",
+    status: "Active",
+    icon: Wrench,
+  },
+  {
+    title: "Web Search",
+    description: "Fallback repair references",
+    status: "Backend key required",
+    icon: Globe2,
+  },
+  {
+    title: "Image Diagnosis",
+    description: "Attach repair photos",
+    status: "Enabled",
+    icon: ImagePlus,
+  },
+  {
+    title: "Conversation Memory",
+    description: "Supabase chat history",
+    status: "Enabled",
+    icon: Database,
+  },
+];
+
 export default function ChatPage() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -59,6 +164,8 @@ export default function ChatPage() {
   const [status, setStatus] = useState<string>("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("chats");
+  const [projectsOpen, setProjectsOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -125,11 +232,30 @@ export default function ChatPage() {
     setStatus("");
     setAttachedImages([]);
     setProfileOpen(false);
+    setActiveSidebarPanel("chats");
   };
 
   const handleOpenSearch = () => {
     setSidebarOpen(true);
+    setActiveSidebarPanel("chats");
     setSearchOpen(true);
+  };
+
+  const openSidebarPanel = (panel: SidebarPanel) => {
+    setSidebarOpen(true);
+    setActiveSidebarPanel(panel);
+    setProfileOpen(false);
+    if (panel !== "chats") {
+      setSearchOpen(false);
+      setSearchQuery("");
+    }
+  };
+
+  const handleRepairPrompt = (prompt: string) => {
+    setInputValue(prompt);
+    setActiveSidebarPanel("chats");
+    setSidebarOpen(true);
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const handleAttachImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -404,6 +530,14 @@ export default function ChatPage() {
         (conv.title || "New chat").toLowerCase().includes(normalizedSearch)
       )
     : conversations;
+  const sidebarButtonClass = (panel: SidebarPanel) =>
+    `flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left transition-colors ${
+      activeSidebarPanel === panel
+        ? "bg-[rgb(var(--chat-elevated))] text-[rgb(var(--chat-text))]"
+        : "text-[rgb(var(--chat-text))] hover:bg-[rgb(var(--chat-hover))]"
+    }`;
+  const panelRowClass =
+    "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-[rgb(var(--chat-hover))]";
 
   return (
     <div className="flex h-screen bg-[rgb(var(--chat-bg))] text-[rgb(var(--chat-text))]">
@@ -446,7 +580,7 @@ export default function ChatPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSidebarOpen(true)}
+                onClick={() => openSidebarPanel("library")}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
                 title="Library"
                 aria-label="Open library"
@@ -455,12 +589,30 @@ export default function ChatPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSidebarOpen(true)}
+                onClick={() => openSidebarPanel("apps")}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="Apps"
+                aria-label="Open apps"
+              >
+                <Blocks className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+              <button
+                type="button"
+                onClick={() => openSidebarPanel("chats")}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
                 title="Chats"
                 aria-label="Open chats"
               >
                 <MessageCircle className="h-5 w-5" strokeWidth={2.1} />
+              </button>
+              <button
+                type="button"
+                onClick={() => openSidebarPanel("more")}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+                title="More"
+                aria-label="Open more"
+              >
+                <MoreHorizontal className="h-5 w-5" strokeWidth={2.1} />
               </button>
             </div>
 
@@ -512,145 +664,351 @@ export default function ChatPage() {
             </button>
             <button
               type="button"
-              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              onClick={() => openSidebarPanel("library")}
+              className={sidebarButtonClass("library")}
             >
               <Library className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
               <span className="text-sm font-medium">Library</span>
             </button>
             <button
               type="button"
-              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              onClick={() => openSidebarPanel("apps")}
+              className={sidebarButtonClass("apps")}
             >
               <Blocks className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
               <span className="text-sm font-medium">Apps</span>
             </button>
             <button
               type="button"
-              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
+              onClick={() => openSidebarPanel("more")}
+              className={sidebarButtonClass("more")}
             >
               <MoreHorizontal className="h-5 w-5 flex-shrink-0" strokeWidth={2.1} />
               <span className="text-sm font-medium">More</span>
             </button>
           </nav>
 
-          <button
-            type="button"
-            className="mb-7 flex h-10 w-full items-center gap-1 rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
-          >
-            <span className="text-sm font-semibold">Projects</span>
-            <ChevronRight className="h-4 w-4" strokeWidth={2.1} />
-          </button>
-
-          <h3 className="px-3 pb-2 text-sm font-semibold text-[rgb(var(--chat-text))]">
-            Chats
-          </h3>
-          {searchOpen && (
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] px-3 py-2">
-              <Search className="h-4 w-4 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2} />
-              <input
-                ref={searchInputRef}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search chats"
-                className="min-w-0 flex-1 bg-transparent text-sm text-[rgb(var(--chat-text))] outline-none placeholder:text-[rgb(var(--chat-muted))]"
-              />
-              {(searchQuery || searchOpen) && (
+          {activeSidebarPanel === "chats" && (
+            <>
+              <section className="mb-5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSearchOpen(false);
-                  }}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
-                  title="Close search"
-                  aria-label="Close search"
+                  onClick={() => setProjectsOpen((open) => !open)}
+                  className="mb-2 flex h-10 w-full items-center justify-between rounded-xl px-3 text-left text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
                 >
-                  <X className="h-4 w-4" strokeWidth={2.1} />
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                    <FolderKanban className="h-4 w-4" strokeWidth={2.1} />
+                    Projects
+                  </span>
+                  <ChevronRight
+                    className={`h-4 w-4 transition-transform ${projectsOpen ? "rotate-90" : ""}`}
+                    strokeWidth={2.1}
+                  />
                 </button>
+                {projectsOpen && (
+                  <div className="space-y-1">
+                    {REPAIR_PROJECTS.map((project) => {
+                      const Icon = project.icon;
+                      return (
+                        <button
+                          key={project.title}
+                          type="button"
+                          onClick={() => handleRepairPrompt(project.prompt)}
+                          className={panelRowClass}
+                        >
+                          <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--chat-elevated))] text-[rgb(255,138,101)]">
+                            <Icon className="h-4 w-4" strokeWidth={2.1} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-[rgb(var(--chat-text))]">
+                              {project.title}
+                            </span>
+                            <span className="block truncate text-xs text-[rgb(var(--chat-muted))]">
+                              {project.description}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <h3 className="px-3 pb-2 text-sm font-semibold text-[rgb(var(--chat-text))]">
+                Chats
+              </h3>
+              {searchOpen && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] px-3 py-2">
+                  <Search className="h-4 w-4 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2} />
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search chats"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-[rgb(var(--chat-text))] outline-none placeholder:text-[rgb(var(--chat-muted))]"
+                  />
+                  {(searchQuery || searchOpen) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSearchOpen(false);
+                      }}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
+                      title="Close search"
+                      aria-label="Close search"
+                    >
+                      <X className="h-4 w-4" strokeWidth={2.1} />
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+              {historyLoading ? (
+                <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">Loading...</p>
+              ) : conversations.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No conversations yet</p>
+              ) : filteredConversations.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No matching chats</p>
+              ) : (
+                <ul className="space-y-1 pb-4">
+                  {filteredConversations.map((conv) => (
+                    <li key={conv.thread_id} className="group/item relative">
+                      {renamingId === conv.thread_id ? (
+                        <div className="flex gap-1 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] p-1.5">
+                          <input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                confirmRename();
+                              }
+                            }}
+                            className="min-w-0 flex-1 rounded-lg border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-2 py-1.5 text-sm text-[rgb(var(--chat-text))] outline-none focus:ring-2 focus:ring-[rgb(255,138,101)]"
+                            autoFocus
+                          />
+                          <button
+                            onClick={confirmRename}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
+                            title="Save"
+                            aria-label="Save conversation name"
+                          >
+                            <Check className="h-4 w-4" strokeWidth={2.2} />
+                          </button>
+                          <button
+                            onClick={() => { setRenamingId(null); setRenameValue(""); }}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
+                            title="Cancel"
+                            aria-label="Cancel rename"
+                          >
+                            <X className="h-4 w-4" strokeWidth={2.2} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleSelectConversation(conv)}
+                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
+                              threadId === conv.thread_id
+                                ? "bg-[rgb(var(--chat-elevated))] text-[rgb(var(--chat-text))]"
+                                : "text-[rgb(var(--chat-text))] hover:bg-[rgb(var(--chat-hover))]"
+                            }`}
+                          >
+                            <span className="truncate">{conv.title || "New chat"}</span>
+                          </button>
+                          <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
+                            <button
+                              onClick={(e) => handleRenameConversation(e, conv)}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-elevated))]"
+                              title="Rename"
+                              aria-label="Rename conversation"
+                            >
+                              <Pencil className="h-3.5 w-3.5" strokeWidth={2.1} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteConversation(e, conv.thread_id)}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
+                              title="Delete"
+                              aria-label="Delete conversation"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" strokeWidth={2.1} />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {conversationError && (
+                <p className="mx-4 mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-300">
+                  {conversationError}
+                </p>
+              )}
+            </>
           )}
-          {historyLoading ? (
-            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">Loading...</p>
-          ) : conversations.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No conversations yet</p>
-          ) : filteredConversations.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No matching chats</p>
-          ) : (
-            <ul className="space-y-1 pb-4">
-              {filteredConversations.map((conv) => (
-                <li key={conv.thread_id} className="group/item relative">
-                  {renamingId === conv.thread_id ? (
-                    <div className="flex gap-1 rounded-xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] p-1.5">
-                      <input
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            confirmRename();
-                          }
-                        }}
-                        className="min-w-0 flex-1 rounded-lg border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-2 py-1.5 text-sm text-[rgb(var(--chat-text))] outline-none focus:ring-2 focus:ring-[rgb(255,138,101)]"
-                        autoFocus
-                      />
+
+          {activeSidebarPanel === "library" && (
+            <section className="space-y-5">
+              <div className="px-3">
+                <h3 className="text-sm font-semibold text-[rgb(var(--chat-text))]">Library</h3>
+                <p className="mt-1 text-xs leading-5 text-[rgb(var(--chat-muted))]">
+                  Repair starters and saved references
+                </p>
+              </div>
+              <div className="space-y-1">
+                {LIBRARY_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      onClick={() => handleRepairPrompt(item.prompt)}
+                      className={panelRowClass}
+                    >
+                      <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--chat-elevated))] text-[rgb(255,138,101)]">
+                        <Icon className="h-4 w-4" strokeWidth={2.1} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-[rgb(var(--chat-text))]">
+                          {item.title}
+                        </span>
+                        <span className="block truncate text-xs text-[rgb(var(--chat-muted))]">
+                          {item.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="border-t border-[rgb(var(--chat-border))] pt-4">
+                <h4 className="px-3 pb-2 text-xs font-semibold uppercase text-[rgb(var(--chat-muted))]">
+                  Recent references
+                </h4>
+                {conversations.slice(0, 4).length > 0 ? (
+                  <div className="space-y-1">
+                    {conversations.slice(0, 4).map((conv) => (
                       <button
-                        onClick={confirmRename}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
-                        title="Save"
-                        aria-label="Save conversation name"
-                      >
-                        <Check className="h-4 w-4" strokeWidth={2.2} />
-                      </button>
-                      <button
-                        onClick={() => { setRenamingId(null); setRenameValue(""); }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-hover))]"
-                        title="Cancel"
-                        aria-label="Cancel rename"
-                      >
-                        <X className="h-4 w-4" strokeWidth={2.2} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <button
+                        key={conv.thread_id}
+                        type="button"
                         onClick={() => handleSelectConversation(conv)}
-                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
-                          threadId === conv.thread_id
-                            ? "bg-[rgb(var(--chat-elevated))] text-[rgb(var(--chat-text))]"
-                            : "text-[rgb(var(--chat-text))] hover:bg-[rgb(var(--chat-hover))]"
-                        }`}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))]"
                       >
+                        <MessageCircle className="h-4 w-4 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
                         <span className="truncate">{conv.title || "New chat"}</span>
                       </button>
-                      <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
-                        <button
-                          onClick={(e) => handleRenameConversation(e, conv)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--chat-muted))] hover:bg-[rgb(var(--chat-elevated))]"
-                          title="Rename"
-                          aria-label="Rename conversation"
-                        >
-                          <Pencil className="h-3.5 w-3.5" strokeWidth={2.1} />
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteConversation(e, conv.thread_id)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
-                          title="Delete"
-                          aria-label="Delete conversation"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" strokeWidth={2.1} />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-3 py-2 text-sm text-[rgb(var(--chat-muted))]">No saved references yet</p>
+                )}
+              </div>
+            </section>
           )}
-          {conversationError && (
-            <p className="mx-4 mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-300">
-              {conversationError}
-            </p>
+
+          {activeSidebarPanel === "apps" && (
+            <section className="space-y-5">
+              <div className="px-3">
+                <h3 className="text-sm font-semibold text-[rgb(var(--chat-text))]">Apps</h3>
+                <p className="mt-1 text-xs leading-5 text-[rgb(var(--chat-muted))]">
+                  Repair tools used by FixGuide AI
+                </p>
+              </div>
+              <div className="space-y-1">
+                {APP_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <div key={tool.title} className="flex items-start gap-3 rounded-xl px-3 py-3">
+                      <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--chat-elevated))] text-[rgb(255,138,101)]">
+                        <Icon className="h-4 w-4" strokeWidth={2.1} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-[rgb(var(--chat-text))]">
+                          {tool.title}
+                        </span>
+                        <span className="block truncate text-xs text-[rgb(var(--chat-muted))]">
+                          {tool.description}
+                        </span>
+                      </span>
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[rgb(var(--chat-elevated))] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--chat-muted))]">
+                        <CircleCheck className="h-3 w-3" strokeWidth={2.2} />
+                        {tool.status}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRepairPrompt("Check the official repair guide first, then use web search only if no guide is available.")}
+                className={panelRowClass}
+              >
+                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--chat-elevated))] text-[rgb(255,138,101)]">
+                  <Sparkles className="h-4 w-4" strokeWidth={2.1} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-[rgb(var(--chat-text))]">
+                    Guided repair flow
+                  </span>
+                  <span className="block truncate text-xs text-[rgb(var(--chat-muted))]">
+                    Start with verified sources
+                  </span>
+                </span>
+              </button>
+            </section>
+          )}
+
+          {activeSidebarPanel === "more" && (
+            <section className="space-y-5">
+              <div className="px-3">
+                <h3 className="text-sm font-semibold text-[rgb(var(--chat-text))]">More</h3>
+                <p className="mt-1 text-xs leading-5 text-[rgb(var(--chat-muted))]">
+                  Account, support, and workspace actions
+                </p>
+              </div>
+              <div className="space-y-1">
+                <button type="button" onClick={() => router.push("/stats")} className={panelRowClass}>
+                  <BarChart3 className="mt-1 h-5 w-5 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[rgb(var(--chat-text))]">Statistics</span>
+                    <span className="block text-xs text-[rgb(var(--chat-muted))]">Usage and conversation activity</span>
+                  </span>
+                </button>
+                <button type="button" onClick={toggleTheme} className={panelRowClass}>
+                  <Settings className="mt-1 h-5 w-5 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[rgb(var(--chat-text))]">Theme</span>
+                    <span className="block text-xs text-[rgb(var(--chat-muted))]">{theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}</span>
+                  </span>
+                </button>
+                <button type="button" onClick={handleShare} className={panelRowClass}>
+                  <Share2 className="mt-1 h-5 w-5 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[rgb(var(--chat-text))]">Share</span>
+                    <span className="block text-xs text-[rgb(var(--chat-muted))]">Copy or share this workspace</span>
+                  </span>
+                </button>
+                <a
+                  href={`${API_CONFIG.BASE_URL}/docs`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={panelRowClass}
+                >
+                  <ExternalLink className="mt-1 h-5 w-5 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[rgb(var(--chat-text))]">API docs</span>
+                    <span className="block text-xs text-[rgb(var(--chat-muted))]">Backend Swagger reference</span>
+                  </span>
+                </a>
+                <button type="button" onClick={() => handleRepairPrompt("What exact device model and symptom should I provide for the best repair guide?")} className={panelRowClass}>
+                  <HelpCircle className="mt-1 h-5 w-5 flex-shrink-0 text-[rgb(var(--chat-muted))]" strokeWidth={2.1} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[rgb(var(--chat-text))]">Help</span>
+                    <span className="block text-xs text-[rgb(var(--chat-muted))]">Ask what details are needed</span>
+                  </span>
+                </button>
+              </div>
+            </section>
           )}
         </div>
 
