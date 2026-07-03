@@ -58,7 +58,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
+    <div className="min-h-dvh flex items-center justify-center bg-white dark:bg-[rgb(15,15,15)] px-3 py-6 sm:px-4 relative">
       <button
         onClick={toggleTheme}
         className="absolute top-4 right-4 p-2 rounded-lg hover:bg-muted transition-colors"
@@ -75,14 +75,14 @@ function LoginForm() {
         )}
       </button>
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex justify-center mb-3 sm:mb-4">
             <Logo size="lg" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             Welcome back
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Sign in to continue to your account
           </p>
         </div>
@@ -149,7 +149,7 @@ function LoginForm() {
           </div>
         </Card>
 
-        <p className="mt-8 text-center text-xs text-[rgb(156,163,175)]">
+        <p className="mt-6 sm:mt-8 px-2 text-center text-xs leading-5 text-[rgb(156,163,175)]">
           By signing in, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>

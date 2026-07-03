@@ -66,19 +66,20 @@ export default function StatsPage() {
   const user = authService.getUser();
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[rgb(15,15,15)]">
+    <div className="min-h-dvh bg-white dark:bg-[rgb(15,15,15)]">
       {/* Header */}
       <header className="border-b border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] bg-white dark:bg-[rgb(31,41,55)]">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo size="sm" />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => router.push("/chat")}>
               Back to Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            <Button variant="outline" size="sm" onClick={handleLogout} className="flex-1 sm:flex-none">
               Logout
             </Button>
           </div>
@@ -86,12 +87,12 @@ export default function StatsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[rgb(15,15,15)] dark:text-white mb-2">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-8 sm:py-12">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[rgb(15,15,15)] dark:text-white mb-2">
             Dashboard
           </h1>
-          <p className="text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)]">
+          <p className="break-words text-sm sm:text-base text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)]">
             {user?.email || "Your statistics and usage"}
           </p>
         </div>
@@ -112,7 +113,7 @@ export default function StatsPage() {
         ) : (
           <div>
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 mb-8">
               <Card>
                 <div className="text-center">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[rgb(255,138,101)]/10 mb-4">
@@ -194,11 +195,11 @@ export default function StatsPage() {
               <h2 className="text-xl font-bold text-[rgb(15,15,15)] dark:text-white mb-4">
                 Quick Actions
               </h2>
-              <div className="flex flex-wrap gap-3">
-                <Button variant="primary" onClick={() => router.push("/chat")}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Button variant="primary" onClick={() => router.push("/chat")} className="w-full sm:w-auto">
                   Start New Conversation
                 </Button>
-                <Button variant="outline" onClick={fetchStats}>
+                <Button variant="outline" onClick={fetchStats} className="w-full sm:w-auto">
                   Refresh Statistics
                 </Button>
               </div>

@@ -439,7 +439,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     (block) => block.type === "heading" && block.level <= 2
   );
   const shouldRenderMarkdown = !isUser && (hasStructuredMarkdown || hasMarkdownImage);
-  const contentWidth = shouldRenderMarkdown ? "w-full max-w-[min(100%,64rem)]" : "max-w-[80%]";
+  const contentWidth = shouldRenderMarkdown ? "w-full max-w-[min(100%,64rem)]" : "max-w-[90%] sm:max-w-[80%]";
 
   const handleCopy = async () => {
     try {
@@ -458,8 +458,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         className={`
           ${
             shouldRenderMarkdown
-              ? "w-full max-w-[min(100%,64rem)] rounded-2xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] px-5 py-5 shadow-sm sm:px-6"
-              : "max-w-[80%] rounded-2xl px-5 py-3"
+              ? "w-full max-w-[min(100%,64rem)] rounded-2xl border border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-surface))] px-4 py-4 shadow-sm sm:px-6 sm:py-5"
+              : "max-w-[90%] rounded-2xl px-4 py-3 sm:max-w-[80%] sm:px-5"
           }
           ${isUser
             ? "bg-[rgb(var(--chat-user-bg))] text-[rgb(var(--chat-user-text))]"

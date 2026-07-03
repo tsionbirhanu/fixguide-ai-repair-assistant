@@ -70,16 +70,16 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[rgb(15,15,15)] px-4 py-12">
+    <div className="min-h-dvh flex items-center justify-center bg-white dark:bg-[rgb(15,15,15)] px-3 py-6 sm:px-4 sm:py-12">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex justify-center mb-3 sm:mb-4">
             <Logo size="lg" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             Create your account
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Get started with FixGuide AI today
           </p>
         </div>
@@ -156,7 +156,7 @@ export default function SignupPage() {
           </div>
         </Card>
 
-        <p className="mt-8 text-center text-xs text-[rgb(156,163,175)]">
+        <p className="mt-6 sm:mt-8 px-2 text-center text-xs leading-5 text-[rgb(156,163,175)]">
           By creating an account, you agree to our Terms of Service and Privacy
           Policy
         </p>

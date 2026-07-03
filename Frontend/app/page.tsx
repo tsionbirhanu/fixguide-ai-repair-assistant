@@ -13,9 +13,9 @@ export default function Home() {
     <div className="min-h-screen bg-white dark:bg-[rgb(15,15,15)]">
       {/* Header */}
       <header className="border-b border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)]">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Logo size="sm" />
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 flex items-center justify-between gap-3">
+          <Logo size="sm" className="min-w-0" />
+          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="sm"
@@ -33,32 +33,34 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 py-20 md:py-32">
+      <section className="max-w-7xl mx-auto px-4 py-14 sm:py-20 md:py-28 lg:py-32">
         <div className="text-center">
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center mb-6 sm:mb-8">
             <Logo size="lg" />
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold text-[rgb(15,15,15)] dark:text-white mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-[rgb(15,15,15)] dark:text-white mb-5 sm:mb-6 leading-tight">
             Your AI-Powered
             <br />
             <span className="text-[rgb(255,138,101)]">Device Repair</span>{" "}
             Assistant
           </h1>
-          <p className="text-xl text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-8 sm:mb-10 max-w-2xl mx-auto">
             Get expert repair guidance for your devices instantly. From iPhones
             to gaming consoles, we&apos;ve got you covered with AI-powered
             step-by-step instructions.
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
             <Button
               variant="primary"
               size="lg"
+              className="w-full sm:w-auto"
               onClick={() => router.push("/signup")}>
               Start Fixing Now
             </Button>
             <Button
               variant="outline"
               size="lg"
+              className="w-full sm:w-auto"
               onClick={() => router.push("/login")}>
               Sign In
             </Button>
@@ -67,11 +69,11 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold text-center text-[rgb(15,15,15)] dark:text-white mb-12">
+      <section className="max-w-7xl mx-auto px-4 py-14 sm:py-20">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-[rgb(15,15,15)] dark:text-white mb-8 sm:mb-12">
           Why Choose FixGuide AI?
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-3">
           <Card>
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgb(255,138,101)]/10 mb-6">
@@ -153,8 +155,8 @@ export default function Home() {
       </section>
 
       {/* Popular Repairs Section */}
-      <section className="max-w-7xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold text-center text-[rgb(15,15,15)] dark:text-white mb-12">
+      <section className="max-w-7xl mx-auto px-4 py-14 sm:py-20">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-[rgb(15,15,15)] dark:text-white mb-8 sm:mb-12">
           Popular Repairs
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -179,13 +181,13 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 py-20">
+      <section className="max-w-7xl mx-auto px-4 py-14 sm:py-20">
         <Card padding="lg">
           <div className="text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-[rgb(15,15,15)] dark:text-white mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[rgb(15,15,15)] dark:text-white mb-4">
               Ready to fix your device?
             </h2>
-            <p className="text-lg text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-8 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-[rgb(107,114,128)] dark:text-[rgb(156,163,175)] mb-8 max-w-2xl mx-auto">
               Join thousands of users who have successfully repaired their
               devices with FixGuide AI. Get started in seconds.
             </p>
@@ -200,7 +202,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] mt-20">
+      <footer className="border-t border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)] mt-12 sm:mt-20">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <Logo size="sm" />

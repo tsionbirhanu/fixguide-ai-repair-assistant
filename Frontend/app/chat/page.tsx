@@ -164,6 +164,7 @@ export default function ChatPage() {
   const [status, setStatus] = useState<string>("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [responsiveReady, setResponsiveReady] = useState(false);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("chats");
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -196,6 +197,20 @@ export default function ChatPage() {
     loadConversations();
   }, [router]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const syncSidebar = () => {
+      setSidebarOpen(!mobileQuery.matches);
+      setResponsiveReady(true);
+    };
+
+    syncSidebar();
+    mobileQuery.addEventListener("change", syncSidebar);
+    return () => mobileQuery.removeEventListener("change", syncSidebar);
+  }, []);
+
   const loadConversations = async () => {
     setHistoryLoading(true);
     setConversationError("");
@@ -224,6 +239,12 @@ export default function ChatPage() {
     router.push("/login");
   };
 
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setSidebarOpen(false);
+    }
+  };
+
   const handleNewConversation = () => {
     setMessages([]);
     setCurrentResponse("");
@@ -233,6 +254,7 @@ export default function ChatPage() {
     setAttachedImages([]);
     setProfileOpen(false);
     setActiveSidebarPanel("chats");
+    closeSidebarOnMobile();
   };
 
   const handleOpenSearch = () => {
@@ -254,7 +276,7 @@ export default function ChatPage() {
   const handleRepairPrompt = (prompt: string) => {
     setInputValue(prompt);
     setActiveSidebarPanel("chats");
-    setSidebarOpen(true);
+    closeSidebarOnMobile();
     setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
@@ -327,6 +349,7 @@ export default function ChatPage() {
   const handleSelectConversation = async (conv: Conversation) => {
     setHistoryLoading(true);
     setProfileOpen(false);
+    closeSidebarOnMobile();
     try {
       const msgs = await fetchConversationMessages(conv.thread_id);
       setMessages(
@@ -538,14 +561,26 @@ export default function ChatPage() {
     }`;
   const panelRowClass =
     "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-[rgb(var(--chat-hover))]";
+  const sidebarWidthClass = !responsiveReady
+    ? "hidden md:flex md:w-[304px]"
+    : sidebarOpen
+      ? "fixed inset-y-0 left-0 z-40 w-[min(86vw,320px)] translate-x-0 md:relative md:z-auto md:w-[304px]"
+      : "hidden md:flex md:w-[76px]";
 
   return (
-    <div className="flex h-screen bg-[rgb(var(--chat-bg))] text-[rgb(var(--chat-text))]">
+    <div className="relative flex h-dvh overflow-hidden bg-[rgb(var(--chat-bg))] text-[rgb(var(--chat-text))]">
+      {responsiveReady && sidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-black/45 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`${
-          sidebarOpen ? "w-[304px]" : "w-[76px]"
-        } flex-shrink-0 border-r border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-sidebar-bg))] overflow-x-hidden overflow-y-auto transition-all duration-200 flex flex-col`}
+        className={`${sidebarWidthClass} flex-shrink-0 border-r border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-sidebar-bg))] overflow-x-hidden overflow-y-auto transition-all duration-200 flex flex-col`}
       >
         {!sidebarOpen ? (
           <div className="flex h-full flex-col items-center py-4">
@@ -632,7 +667,7 @@ export default function ChatPage() {
           </div>
         ) : (
           <>
-        <div className="flex items-center justify-between px-5 pb-4 pt-5">
+        <div className="flex items-center justify-between px-4 pb-4 pt-5 sm:px-5">
           <Logo size="sm" showText={false} />
           <button
             onClick={() => setSidebarOpen(false)}
@@ -644,7 +679,7 @@ export default function ChatPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 pb-3">
+        <div className="flex-1 overflow-y-auto px-2.5 pb-3 sm:px-3">
           <nav className="space-y-1 pb-6">
             <button
               type="button"
@@ -1095,15 +1130,26 @@ export default function ChatPage() {
       </aside>
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[rgb(var(--chat-bg))]">
-        <header className="flex-shrink-0 border-b border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-[rgb(var(--chat-text))]">
+      <div className="flex min-w-0 flex-1 flex-col bg-[rgb(var(--chat-bg))]">
+        <header className="flex-shrink-0 border-b border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-3 py-3 sm:px-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-[rgb(var(--chat-text))] transition-colors hover:bg-[rgb(var(--chat-hover))] md:hidden"
+              title="Open sidebar"
+              aria-label="Open sidebar"
+            >
+              <PanelLeftClose className="h-5 w-5 rotate-180" strokeWidth={2} />
+            </button>
+            <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold text-[rgb(var(--chat-text))] sm:text-lg">
               FixGuide AI
             </h1>
-            <p className="text-xs text-[rgb(var(--chat-muted))]">
+            <p className="hidden truncate text-xs text-[rgb(var(--chat-muted))] sm:block">
               Ask about device repairs and troubleshooting
             </p>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -1130,24 +1176,24 @@ export default function ChatPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto bg-[rgb(var(--chat-bg))]">
-          <div className="max-w-5xl mx-auto px-4 py-8 lg:px-8">
+          <div className="mx-auto max-w-5xl px-3 py-5 sm:px-4 sm:py-8 lg:px-8">
             {messages.length === 0 && !currentResponse && (
-              <div className="text-center py-12">
-                <div className="flex justify-center mb-6">
+              <div className="py-8 text-center sm:py-12">
+                <div className="flex justify-center mb-4 sm:mb-6">
                   <Logo size="lg" />
                 </div>
-                <h2 className="text-2xl font-bold text-[rgb(var(--chat-text))] mb-4">
+                <h2 className="text-xl font-bold text-[rgb(var(--chat-text))] mb-3 sm:text-2xl sm:mb-4">
                   How can I help you today?
                 </h2>
-                <p className="text-[rgb(var(--chat-muted))] mb-8">
+                <p className="mb-6 text-sm text-[rgb(var(--chat-muted))] sm:mb-8 sm:text-base">
                   Ask me anything about device repairs and troubleshooting
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-4xl mx-auto">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-4xl mx-auto">
                   {SAMPLE_QUESTIONS.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => sendMessage(q)}
-                      className="p-4 text-left rounded-xl border border-[rgb(var(--chat-border))] hover:border-[rgb(255,138,101)] bg-[rgb(var(--chat-surface))] hover:bg-[rgb(var(--chat-hover))] transition-all"
+                      className="p-3 sm:p-4 text-left rounded-xl border border-[rgb(var(--chat-border))] hover:border-[rgb(255,138,101)] bg-[rgb(var(--chat-surface))] hover:bg-[rgb(var(--chat-hover))] transition-all"
                     >
                       <p className="text-sm text-[rgb(var(--chat-text))]">{q}</p>
                     </button>
@@ -1189,8 +1235,8 @@ export default function ChatPage() {
         </div>
 
         {/* Input area with voice and attach */}
-        <div className="flex-shrink-0 border-t border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-4 py-4">
-          <div className="max-w-5xl mx-auto lg:px-8">
+        <div className="flex-shrink-0 border-t border-[rgb(var(--chat-border))] bg-[rgb(var(--chat-bg))] px-3 py-3 sm:px-4 sm:py-4">
+          <div className="mx-auto max-w-5xl lg:px-8">
             {attachedImages.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
                 {attachedImages.map((src, i) => (
@@ -1236,7 +1282,7 @@ export default function ChatPage() {
                 placeholder="Ask AI about device repairs..."
                 disabled={isLoading}
                 rows={1}
-                className="min-h-[48px] w-full resize-none bg-transparent px-2 py-3 text-sm leading-6 text-[rgb(var(--chat-text))] outline-none placeholder-[rgb(var(--chat-muted))] disabled:opacity-50"
+                className="min-h-[44px] w-full resize-none bg-transparent px-2 py-2.5 text-sm leading-6 text-[rgb(var(--chat-text))] outline-none placeholder-[rgb(var(--chat-muted))] disabled:opacity-50 sm:min-h-[48px] sm:py-3"
               />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1">
@@ -1290,7 +1336,7 @@ export default function ChatPage() {
                 </button>
               </div>
             </form>
-            <p className="mt-2 text-center text-xs text-[rgb(156,163,175)]">
+            <p className="mt-2 hidden text-center text-xs text-[rgb(156,163,175)] sm:block">
               Press Enter to send | Shift+Enter for new line
             </p>
           </div>

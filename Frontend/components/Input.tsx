@@ -28,7 +28,7 @@ export const Input: React.FC<InputProps> = ({
       <input
         id={inputId}
         className={`
-          w-full px-4 py-3 rounded-lg
+          w-full px-3 py-3 sm:px-4 rounded-lg
           bg-white dark:bg-[rgb(31,41,55)]
           border border-[rgb(229,231,235)] dark:border-[rgb(55,65,81)]
           text-[rgb(15,15,15)] dark:text-white
