@@ -17,6 +17,9 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const isRateLimitError =
+    error.toLowerCase().includes("rate limit") ||
+    error.toLowerCase().includes("too many requests");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,9 +94,15 @@ export default function SignupPage() {
                 <p className="text-sm text-red-600 dark:text-red-400">
                   {error}
                 </p>
-                <p className="mt-2 text-xs text-red-500 dark:text-red-300">
-                  Already created an account? Use the sign-in page instead.
-                </p>
+                {isRateLimitError ? (
+                  <p className="mt-2 text-xs text-red-500 dark:text-red-300">
+                    Supabase is temporarily blocking more verification emails. Wait for the limit to reset, or add a custom SMTP provider in Supabase.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-red-500 dark:text-red-300">
+                    Already created an account? Use the sign-in page instead.
+                  </p>
+                )}
               </div>
             )}
 

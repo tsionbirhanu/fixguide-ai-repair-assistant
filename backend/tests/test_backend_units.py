@@ -179,6 +179,12 @@ class AuthMessageTests(unittest.TestCase):
         self.assertIn("Supabase hostname cannot be found", message)
         self.assertIn("SUPABASE_URL", message)
 
+    def test_email_rate_limit_error_is_friendly(self):
+        message = _extract_error_message(self.FakeAuthError("email rate limit exceeded"))
+
+        self.assertIn("email rate limit exceeded", message.lower())
+        self.assertIn("custom SMTP", message)
+
 
 class SupabaseSignupRedirectTests(unittest.TestCase):
     class FakeSupabaseAuth:

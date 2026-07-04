@@ -36,6 +36,14 @@ function friendlyAuthError(message: string, mode: "login" | "signup"): string {
     return "Email or password is incorrect. If you just created the account, confirm your email first, then sign in.";
   }
 
+  if (
+    normalized.includes("email rate limit") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests")
+  ) {
+    return "Supabase email rate limit exceeded. Please wait before trying again, or configure custom SMTP in Supabase for production email sending.";
+  }
+
   if (normalized.includes("email not confirmed") || normalized.includes("confirm your email")) {
     return "Please confirm your email address before signing in. Check your inbox or spam folder.";
   }

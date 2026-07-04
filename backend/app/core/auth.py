@@ -83,6 +83,11 @@ def _extract_error_message(exc: Exception) -> str:
         return "Cannot reach Supabase. Please check your internet connection."
 
     # Common Supabase error patterns - make them more user-friendly
+    if "rate limit" in normalized or "email rate limit" in normalized or "too many requests" in normalized:
+        return (
+            "Supabase email rate limit exceeded. Please wait before trying again, "
+            "or configure a custom SMTP provider in Supabase for production email sending."
+        )
     if "already registered" in normalized or "already been registered" in normalized or "already exists" in normalized:
         return "This email is already registered. Please sign in instead."
     if "email not confirmed" in normalized or "email_not_confirmed" in normalized or "confirm" in normalized:
