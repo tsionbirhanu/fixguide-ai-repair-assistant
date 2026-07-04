@@ -11,7 +11,7 @@ from app.agent.ifixit_tool import (
     select_best_guide,
 )
 from app.api import chat
-from app.core.auth import _demo_users, _extract_error_message, auth_service
+from app.core.auth import AuthService, _demo_users, _extract_error_message, auth_service
 from app.core.config import Settings, settings
 from app.core.api_keys import RoundRobinKeyRing
 from app.main import app
@@ -178,6 +178,47 @@ class AuthMessageTests(unittest.TestCase):
 
         self.assertIn("Supabase hostname cannot be found", message)
         self.assertIn("SUPABASE_URL", message)
+
+
+class SupabaseSignupRedirectTests(unittest.TestCase):
+    class FakeSupabaseAuth:
+        def __init__(self):
+            self.payload = None
+
+        def sign_up(self, payload):
+            self.payload = payload
+
+            class Response:
+                user = None
+                session = None
+
+            return Response()
+
+    class FakeSupabaseClient:
+        def __init__(self):
+            self.auth = SupabaseSignupRedirectTests.FakeSupabaseAuth()
+
+    def test_signup_sends_frontend_verification_redirect(self):
+        original_demo_auth = settings.DEMO_AUTH
+        original_frontend_url = settings.FRONTEND_URL
+        fake_client = self.FakeSupabaseClient()
+        service = AuthService()
+        service._client = fake_client
+
+        try:
+            settings.DEMO_AUTH = False
+            settings.FRONTEND_URL = "https://fixguide-ai-repair-assistant.vercel.app/"
+
+            result = asyncio.run(service.signup("user@example.com", "secret123"))
+
+            self.assertTrue(result["success"])
+            self.assertEqual(
+                fake_client.auth.payload["options"]["email_redirect_to"],
+                "https://fixguide-ai-repair-assistant.vercel.app/login?verified=1",
+            )
+        finally:
+            settings.DEMO_AUTH = original_demo_auth
+            settings.FRONTEND_URL = original_frontend_url
 
 
 class DemoConversationApiTests(unittest.TestCase):

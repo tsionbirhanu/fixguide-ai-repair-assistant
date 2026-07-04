@@ -24,7 +24,12 @@ function LoginForm() {
   useEffect(() => {
     const emailParam = searchParams.get("email");
     const fromSignup = searchParams.get("signedup");
+    const verified = searchParams.get("verified");
     if (emailParam) setEmail(decodeURIComponent(emailParam));
+    if (verified === "1") {
+      setSuccess("Email verified. You can sign in now.");
+      return;
+    }
     if (fromSignup === "1") {
       setSuccess("Account created. If Supabase email confirmation is enabled, verify your inbox before signing in.");
     }

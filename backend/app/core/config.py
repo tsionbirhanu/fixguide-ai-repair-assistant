@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     CORS_ORIGINS: str = ",".join(DEFAULT_CORS_ORIGINS)
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # LangGraph Configuration
     LANGCHAIN_API_KEY: str = ""
@@ -100,6 +101,16 @@ class Settings(BaseSettings):
             if clean_origin and clean_origin not in origins:
                 origins.append(clean_origin)
         return origins
+
+    @property
+    def frontend_url(self) -> str:
+        """Return the frontend app URL without a trailing slash."""
+        return (self.FRONTEND_URL or "http://localhost:3000").strip().rstrip("/")
+
+    @property
+    def auth_email_redirect_url(self) -> str:
+        """Supabase email verification redirect target."""
+        return f"{self.frontend_url}/login?verified=1"
 
     @staticmethod
     def _split_keys(value: str) -> List[str]:

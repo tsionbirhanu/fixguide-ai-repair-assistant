@@ -118,6 +118,7 @@ API_PORT=8000
 DEBUG=true
 
 CORS_ORIGINS=http://localhost:3000,https://fixguide-ai-repair-assistant.vercel.app
+FRONTEND_URL=http://localhost:3000
 
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_API_KEYS=
@@ -153,6 +154,25 @@ Open:
 2. Open the Supabase SQL Editor.
 3. Run the full SQL script in `backend/supabase_schema.sql`.
 4. Copy the Supabase project URL, anon key, and service role key into `backend/.env`.
+5. Open Authentication > URL Configuration in Supabase.
+6. Set Site URL to your frontend URL.
+7. Add your local and production redirect URLs.
+
+For local development:
+
+```text
+Site URL: http://localhost:3000
+Redirect URLs:
+http://localhost:3000/**
+```
+
+For the deployed app:
+
+```text
+Site URL: https://fixguide-ai-repair-assistant.vercel.app
+Redirect URLs:
+https://fixguide-ai-repair-assistant.vercel.app/**
+```
 
 For real persistent sessions, use:
 
@@ -208,6 +228,7 @@ http://localhost:3000
 | `SUPABASE_SERVICE_KEY` | Recommended | Supabase service role key for trusted backend writes. |
 | `DEMO_AUTH` | Yes | `false` for production, `true` for local demo mode. |
 | `CORS_ORIGINS` | Yes | Comma-separated allowed frontend origins. |
+| `FRONTEND_URL` | Yes | Frontend URL used in Supabase email verification links. |
 | `DEBUG` | Yes | `true` locally, `false` in production. |
 | `IFIXIT_APP_ID` | No | Optional iFixit App ID if provided by iFixit. Public guide reads do not usually need it. |
 | `IFIXIT_APP_IDS` | No | Optional iFixit App ID rotation pool. |
@@ -300,6 +321,7 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_KEY=your_supabase_service_key
 CORS_ORIGINS=http://localhost:3000,https://fixguide-ai-repair-assistant.vercel.app
+FRONTEND_URL=https://fixguide-ai-repair-assistant.vercel.app
 ```
 
 Current deployed backend:
@@ -337,6 +359,8 @@ After Vercel deploys, copy the Vercel frontend URL and add it to the Render back
 - Add real Supabase, Gemini, and Tavily keys to Render.
 - Add only `NEXT_PUBLIC_API_BASE_URL` to Vercel.
 - Add Vercel frontend URL to backend `CORS_ORIGINS`.
+- Add Vercel frontend URL to backend `FRONTEND_URL`.
+- Set Supabase Auth Site URL and Redirect URLs to the Vercel frontend URL.
 - Confirm `/health` returns healthy.
 - Confirm `/docs` loads.
 - Confirm signup, login, chat streaming, and conversation history work.

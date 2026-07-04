@@ -168,7 +168,10 @@ class AuthService:
         try:
             response = self.client.auth.sign_up({
                 "email": email,
-                "password": password
+                "password": password,
+                "options": {
+                    "email_redirect_to": settings.auth_email_redirect_url
+                }
             })
             
             access_token = response.session.access_token if response.session else None
