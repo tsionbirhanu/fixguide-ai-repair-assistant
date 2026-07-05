@@ -10,7 +10,7 @@ Live backend:
 
 ## Features
 
-- Modern conversational repair assistant UI built with Next.js and Tailwind CSS.
+- Modern conversational repair assistant UI built with Next.js and TailwindCSS.
 - FastAPI backend with streaming Server-Sent Events responses.
 - Gemini-powered repair agent using LangGraph.
 - Official iFixit guide lookup with steps, tools, parts, source links, and guide images.
